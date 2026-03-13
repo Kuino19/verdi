@@ -56,6 +56,13 @@
     max-width: 100vw;
     min-height: 100vh;
     overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+
+  /* Selection highlight */
+  ::selection {
+    background: rgba(201, 162, 39, 0.3);
+    color: #F8FAFC;
   }
 
   body {
@@ -121,8 +128,10 @@
 
   /* Layout */
   .container {
-    @apply w-full mx-auto px-6;
+    @apply w-full mx-auto;
     max-width: 1280px;
+    padding-left: clamp(1rem, 5vw, 2rem);
+    padding-right: clamp(1rem, 5vw, 2rem);
   }
 
   /* Scrollbar */
@@ -175,4 +184,21 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Slower, smoother float for decorative elements */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33%       { transform: translateY(-12px) rotate(1deg); }
+  66%       { transform: translateY(-6px) rotate(-1deg); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+.animate-float-slow {
+  animation: float 6s ease-in-out infinite;
+}
+.animate-float-delayed {
+  animation: float 5s ease-in-out 1s infinite;
 }
