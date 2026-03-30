@@ -1,0 +1,47 @@
+
+> verdi@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 15.5s
+  Running TypeScript ...
+  Collecting page data using 13 workers ...
+  Generating static pages using 13 workers (0/24) ...
+  Generating static pages using 13 workers (6/24) 
+  Generating static pages using 13 workers (12/24) 
+  Generating static pages using 13 workers (18/24) 
+✓ Generating static pages using 13 workers (24/24) in 740.5ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/ai
+├ ƒ /api/auth/session
+├ ƒ /assistant
+├ ƒ /bookmarks
+├ ƒ /caseflow
+├ ƒ /cases
+├ ƒ /cases/[id]
+├ ƒ /community
+├ ƒ /dashboard
+├ ƒ /dictionary
+├ ƒ /exam-generator
+├ ƒ /flashcards
+├ ƒ /leaderboard
+├ ○ /login
+├ ○ /onboarding
+├ ƒ /past-papers
+├ ƒ /referrals
+├ ○ /register
+├ ƒ /settings
+├ ƒ /study-planner
+└ ƒ /upgrade
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

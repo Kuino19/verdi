@@ -56,7 +56,7 @@ export default function DictionaryPage() {
            placeholder="Search for a term (e.g., Stare Decisis)..."
            value={searchQuery}
            onChange={(e) => setSearchQuery(e.target.value)}
-           className="w-full bg-white/5 border border-white/10 rounded-[32px] py-8 pl-18 pr-8 text-xl italic font-serif focus:outline-none focus:border-primary/50 transition-all font-medium text-foreground pl-16"
+           className="w-full bg-white/5 border border-white/10 rounded-[32px] py-8 pr-8 text-xl italic font-serif focus:outline-none focus:border-primary/50 transition-all font-medium text-foreground pl-16"
          />
       </section>
 

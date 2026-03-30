@@ -1,33 +1,23 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Send, 
-  BrainCircuit, 
-  PlusCircle, 
-  History, 
-  Bookmark, 
-  ThumbsUp, 
-  ThumbsDown,
-  RotateCcw,
-  Sparkles,
-  Gavel,
-  Scale
-} from "lucide-react";
+import { Send, BrainCircuit, RotateCcw, Gavel, Scale, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { useUserContext } from "@/components/app/UserContext";
 
 const suggestedPrompts = [
-  "Explain Promissory Estoppel in Nigeria",
+  "Explain Promissory Estoppel",
   "Summarize Donoghue v Stevenson",
-  "What is the Rule in Rylands v Fletcher?",
-  "Difference between Murder and Manslaughter",
+  "Rule in Rylands v Fletcher",
+  "Murder vs Manslaughter",
 ];
 
 export default function AssistantPage() {
+  const { userName } = useUserContext();
   const [messages, setMessages] = useState([
     { 
       role: "assistant", 
-      content: "Hello Adeyemi! I'm your VERDI AI tutor. I've been trained on Nigerian legal materials and past exam questions. How can I help you simplify your legal studies today?",
+      content: `Hello ${userName}! I'm your VERDI AI tutor. Ask me anything about Nigerian law, case principles, or exam prep.`,
       time: "Just now"
     }
   ]);
@@ -36,27 +26,20 @@ export default function AssistantPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isTyping]);
 
   const handleSend = async (text?: string) => {
-    const messageContent = text || input;
-    if (!messageContent.trim() || isTyping) return;
+    const content = text || input;
+    if (!content.trim() || isTyping) return;
 
-    const userMessage = { 
-      role: "user", 
-      content: messageContent, 
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-    };
-    
+    const userMessage = { role: "user", content, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     setMessages(prev => [...prev, userMessage]);
     if (!text) setInput("");
     setIsTyping(true);
 
     try {
-      const response = await fetch("/api/ai", {
+      const res = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -64,182 +47,132 @@ export default function AssistantPage() {
           type: "assistant"
         }),
       });
-
-      const data = await response.json();
-      
+      const data = await res.json();
       if (data.content) {
-        setMessages(prev => [...prev, { 
-          role: "assistant", 
-          content: data.content,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
+        setMessages(prev => [...prev, { role: "assistant", content: data.content, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
       } else {
-        throw new Error("Empty response");
+        throw new Error(data.details || "No response");
       }
-    } catch (error) {
-      setMessages(prev => [...prev, { 
-        role: "assistant", 
-        content: "I'm sorry, I encountered an error. Please try again.",
-        time: "Just now"
-      }]);
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", content: "Something went wrong. Please try again.", time: "Just now" }]);
     } finally {
       setIsTyping(false);
     }
   };
 
   return (
-    <div className="h-[calc(100vh-140px)] flex gap-8">
-      {/* Sidebar: History & Tips */}
-      <div className="hidden lg:flex flex-col w-72 space-y-6">
-        <button className="flex items-center justify-center gap-3 w-full py-4 bg-primary text-background font-black rounded-2xl hover:scale-105 transition-all shadow-xl shadow-primary/20">
-          <PlusCircle className="w-5 h-5" /> New Chat
-        </button>
+    <div className="flex flex-col" style={{ height: 'calc(100dvh - 56px - 2rem)' }}>
 
-        <div className="flex-grow glass p-6 rounded-[32px] border-white/5 space-y-6 overflow-y-auto no-scrollbar">
-          <div>
-            <h4 className="flex items-center gap-2 text-[10px] font-black text-muted uppercase tracking-widest mb-4 italic">
-              <History className="w-3.5 h-3.5" /> Recent Sessions
-            </h4>
-            <div className="space-y-3">
-              {[
-                "Doctrine of Laches",
-                "Case: Smith v Hughes",
-                "Exam Tips: Tort Law",
-                "Vicarious Liability"
-              ].map((item, i) => (
-                <button key={i} className="w-full text-left p-3 rounded-xl hover:bg-white/5 text-xs font-bold text-muted truncate transition-all">
-                  {item}
-                </button>
-              ))}
-            </div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center">
+            <BrainCircuit className="w-4 h-4 text-primary" />
           </div>
-
           <div>
-             <h4 className="flex items-center gap-2 text-[10px] font-black text-muted uppercase tracking-widest mb-4 italic">
-              <Sparkles className="w-3.5 h-3.5" /> Learning Tips
-            </h4>
-            <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">
-               <p className="text-[10px] text-emerald-500 font-black italic mb-2 tracking-wide uppercase">AI Pro-Tip</p>
-               <p className="text-[11px] text-muted leading-relaxed">Ask me to "simultaneously summarize and compare" two cases to see how their ratios differ.</p>
-            </div>
+            <p className="text-sm font-semibold">VERDI Legal Tutor</p>
+            <p className="text-xs text-emerald-500">Online</p>
           </div>
         </div>
+        <button
+          onClick={() => setMessages([{ role: "assistant", content: `Hello ${userName}! Ask me anything about Nigerian law.`, time: "Just now" }])}
+          className="p-2 rounded-lg text-muted hover:text-foreground transition-colors"
+          title="New conversation"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-grow flex flex-col glass rounded-[40px] border-white/5 relative overflow-hidden">
-        {/* Chat Header */}
-        <div className="p-6 border-b border-white/5 flex items-center justify-between">
-           <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center relative">
-                 <BrainCircuit className="w-6 h-6 text-primary" />
-                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#0B1120]"></span>
+      {/* Messages */}
+      <div
+        ref={scrollRef}
+        className="flex-grow overflow-y-auto no-scrollbar space-y-4 pb-4"
+      >
+        {messages.map((m, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18 }}
+            className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div className={`flex gap-2.5 max-w-[85%] md:max-w-[75%] ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center self-end ${m.role === 'user' ? 'bg-primary/20' : 'bg-white/[0.06]'}`}>
+                {m.role === 'user'
+                  ? <Gavel className="w-3.5 h-3.5 text-primary" />
+                  : <Scale className="w-3.5 h-3.5 text-muted" />
+                }
               </div>
               <div>
-                 <h3 className="text-lg font-bold">VERDI Legal Tutor</h3>
-                 <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest italic">AI Study Mode Active</p>
-              </div>
-           </div>
-           <div className="flex items-center gap-2">
-              <button className="p-2.5 glass rounded-xl text-muted hover:text-foreground transition-all">
-                 <Bookmark className="w-4 h-4" />
-              </button>
-              <button className="p-2.5 glass rounded-xl text-muted hover:text-foreground transition-all">
-                 <RotateCcw className="w-4 h-4" />
-              </button>
-           </div>
-        </div>
-
-        {/* Messages */}
-        <div 
-          ref={scrollRef}
-          className="flex-grow p-6 overflow-y-auto space-y-8 no-scrollbar scroll-smooth"
-        >
-          {messages.map((m, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`max-w-[80%] flex items-start gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                 <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${m.role === 'user' ? 'bg-primary text-background' : 'glass border-white/10 text-primary'}`}>
-                    {m.role === 'user' ? <Gavel className="w-5 h-5" /> : <Scale className="w-5 h-5" />}
-                 </div>
-                 <div className="space-y-2">
-                    <div className={`p-6 rounded-[28px] text-sm leading-relaxed ${
-                      m.role === 'user' 
-                        ? 'bg-primary/10 border border-primary/20 rounded-tr-none' 
-                        : 'glass border-white/5 rounded-tl-none'
-                    }`}>
-                      {m.content}
-                    </div>
-                    <div className={`flex items-center gap-4 ${m.role === 'user' ? 'justify-end' : ''}`}>
-                       <span className="text-[10px] text-muted font-bold tracking-widest uppercase">{m.time}</span>
-                       {m.role === 'assistant' && (
-                         <div className="flex items-center gap-2">
-                            <button className="text-muted hover:text-emerald-500 transition-colors"><ThumbsUp className="w-3 h-3" /></button>
-                            <button className="text-muted hover:text-rose-500 transition-colors"><ThumbsDown className="w-3 h-3" /></button>
-                         </div>
-                       )}
-                    </div>
-                 </div>
-              </div>
-            </motion.div>
-          ))}
-          {isTyping && (
-             <div className="flex justify-start">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl glass border-white/10 flex items-center justify-center">
-                    <BrainCircuit className="w-5 h-5 text-primary animate-pulse" />
-                  </div>
-                  <div className="p-4 glass border-white/5 rounded-[20px] rounded-tl-none flex gap-1">
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce"></span>
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                  </div>
+                <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                  m.role === 'user'
+                    ? 'bg-primary/15 rounded-br-sm'
+                    : 'bg-white/[0.05] border border-white/[0.06] rounded-bl-sm'
+                }`}>
+                  {m.content}
                 </div>
-             </div>
-          )}
+                <div className={`flex items-center gap-2 mt-1 ${m.role === 'user' ? 'justify-end' : ''}`}>
+                  <span className="text-[10px] text-muted/60">{m.time}</span>
+                  {m.role === 'assistant' && (
+                    <div className="flex gap-1">
+                      <button className="text-muted/40 hover:text-emerald-400 transition-colors"><ThumbsUp className="w-3 h-3" /></button>
+                      <button className="text-muted/40 hover:text-rose-400 transition-colors"><ThumbsDown className="w-3 h-3" /></button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+
+        {isTyping && (
+          <div className="flex gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center">
+              <BrainCircuit className="w-3.5 h-3.5 text-muted animate-pulse" />
+            </div>
+            <div className="px-4 py-3 bg-white/[0.05] border border-white/[0.06] rounded-2xl rounded-bl-sm flex gap-1.5 items-center">
+              <span className="w-1.5 h-1.5 bg-muted/40 rounded-full animate-bounce" />
+              <span className="w-1.5 h-1.5 bg-muted/40 rounded-full animate-bounce [animation-delay:0.15s]" />
+              <span className="w-1.5 h-1.5 bg-muted/40 rounded-full animate-bounce [animation-delay:0.3s]" />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input */}
+      <div className="flex-shrink-0 pt-3 border-t border-white/[0.06]">
+        {/* Suggested prompts */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
+          {suggestedPrompts.map((p, i) => (
+            <button
+              key={i}
+              onClick={() => handleSend(p)}
+              className="flex-shrink-0 px-3 py-1.5 bg-white/[0.04] border border-white/[0.07] rounded-full text-xs text-muted hover:text-foreground hover:border-white/15 transition-all"
+            >
+              {p}
+            </button>
+          ))}
         </div>
 
-        {/* Action Bar */}
-        <div className="p-6 border-t border-white/5 bg-slate-900/50">
-          <div className="flex flex-wrap gap-2 mb-6">
-            {suggestedPrompts.map((p, i) => (
-              <button 
-                key={i} 
-                onClick={() => handleSend(p)}
-                className="px-4 py-2 glass rounded-full text-[11px] font-bold text-muted hover:text-primary hover:border-primary/20 transition-all border-white/5"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-          
-          <form 
-            onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-            className="relative"
+        <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask a legal question..."
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl py-3.5 pl-4 pr-12 text-sm focus:outline-none focus:border-primary/40 transition-all placeholder:text-muted/40"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isTyping}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-background hover:opacity-90 transition-opacity disabled:opacity-30"
           >
-            <input 
-              type="text" 
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your legal question here..."
-              className="w-full bg-white/5 border border-white/10 rounded-2xl py-6 pl-6 pr-16 text-sm italic focus:outline-none focus:border-primary/50 transition-all"
-            />
-            <button 
-              type="submit"
-              disabled={!input.trim()}
-              className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-primary text-background rounded-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
-          <p className="text-center mt-4 text-[10px] text-muted italic">
-             VERDI AI can make mistakes. Always verify critical information with your official text books and lecture notes.
-          </p>
-        </div>
+            <Send className="w-3.5 h-3.5" />
+          </button>
+        </form>
+        <p className="text-center mt-2 text-[10px] text-muted/40">
+          Verify AI responses with official sources.
+        </p>
       </div>
     </div>
   );

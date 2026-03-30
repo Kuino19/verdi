@@ -14,7 +14,9 @@ import {
   Clock,
   RotateCcw
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { storage } from "@/lib/firebase/client";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 const mockQuestions = [
   {
@@ -42,31 +44,75 @@ const mockQuestions = [
 
 export default function ExamGeneratorPage() {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isGenerated, setIsGenerated] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  interface Question {
+    id: number;
+    question: string;
+    type: string;
+    difficulty: string;
+    modelAnswer: string;
+  }
+  const [generatedQuestions, setGeneratedQuestions] = useState<Question[]>([]);
 
-  const handleUpload = async () => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleUpload(file);
+    }
+  };
+
+  const handleUpload = async (file: File) => {
     setIsUploading(true);
+    setUploadProgress(0);
+
     try {
+      // 1. Upload to Firebase Storage
+      const storageRef = ref(storage, `exam-notes/${Date.now()}-${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      const downloadURL = await new Promise<string>((resolve, reject) => {
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(progress);
+          },
+          (error) => reject(error),
+          async () => {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(url);
+          }
+        );
+      });
+
+      // 2. Call AI API with file context
       const response = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [{ role: "user", content: "Generate 3 law exam questions based on common Nigerian law exam topics like Tort, Contract, or Constitutional law. Provide a question, type, difficulty, and a model answer for each in a JSON format: { questions: [{ id, question, type, difficulty, modelAnswer }] }" }],
+          messages: [{ 
+            role: "user", 
+            content: `Please analyze the document at ${downloadURL} and generate 3 high-quality law exam questions. Provide the output in this JSON format: { "questions": [{ "id": 1, "question": "...", "type": "...", "difficulty": "...", "modelAnswer": "..." }] }` 
+          }],
           type: "exam"
         })
       });
       const data = await response.json();
       
-      // Attempt to parse JSON from AI response if it's wrapped in text
       const content = data.content;
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        setGeneratedQuestions(parsed.questions || []);
-      } else {
-        // Fallback or manual parsing if needed
+      try {
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          setGeneratedQuestions(parsed.questions || []);
+        } else {
+          setGeneratedQuestions([]);
+        }
+      } catch (e) {
+        console.error("Failed to parse AI response as JSON:", e);
         setGeneratedQuestions([]);
       }
       
@@ -89,17 +135,32 @@ export default function ExamGeneratorPage() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass p-16 rounded-[48px] border-dashed border-2 border-white/10 flex flex-col items-center justify-center text-center group hover:border-primary/30 transition-all cursor-pointer"
-          onClick={handleUpload}
+          className="glass p-16 rounded-[48px] border-dashed border-2 border-white/10 flex flex-col items-center justify-center text-center group hover:border-primary/30 transition-all cursor-pointer relative"
+          onClick={() => fileInputRef.current?.click()}
         >
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileSelect} 
+            accept=".pdf" 
+            className="hidden" 
+          />
           {isUploading ? (
-             <div className="flex flex-col items-center gap-6">
-                <div className="w-20 h-20 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+              <>
+                <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden mb-4">
+                   <motion.div 
+                     initial={{ width: 0 }}
+                     animate={{ width: `${uploadProgress}%` }}
+                     className="h-full bg-primary"
+                   />
+                </div>
                 <div>
-                   <h3 className="text-xl font-bold mb-2 animate-pulse">Analyzing Lecture Handout...</h3>
+                   <h3 className="text-xl font-bold mb-2 animate-pulse">
+                     {uploadProgress < 100 ? `Uploading (${Math.round(uploadProgress)}%)...` : 'Analyzing Handout...'}
+                   </h3>
                    <p className="text-sm text-muted">AIEngine is extracting key principles and questioning styles</p>
                 </div>
-             </div>
+              </>
           ) : (
             <>
               <div className="w-24 h-24 rounded-[32px] bg-primary/10 flex items-center justify-center mb-8 group-hover:bg-primary/20 group-hover:scale-110 transition-all">

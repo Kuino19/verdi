@@ -1,0 +1,31 @@
+
+> verdi@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 8.7s
+  Running TypeScript ...
+  Collecting page data using 13 workers ...
+  Generating static pages using 13 workers (0/24) ...
+  Generating static pages using 13 workers (6/24) 
+  Generating static pages using 13 workers (12/24) 
+  Generating static pages using 13 workers (18/24) 
+Error occurred prerendering page "/login". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: Invalid supabaseUrl: Must be a valid HTTP or HTTPS URL.
+    at <unknown> (C:\Users\IFEDAYO LAWAL\Documents\verdi\.next\server\chunks\ssr\_4d226d56._.js:37:43509)
+    at new ce (C:\Users\IFEDAYO LAWAL\Documents\verdi\.next\server\chunks\ssr\_4d226d56._.js:37:43691)
+    at <unknown> (C:\Users\IFEDAYO LAWAL\Documents\verdi\.next\server\chunks\ssr\_4d226d56._.js:59:4312)
+    at cs (C:\Users\IFEDAYO LAWAL\Documents\verdi\.next\server\chunks\ssr\_4d226d56._.js:59:4544)
+    at m (C:\Users\IFEDAYO LAWAL\Documents\verdi\.next\server\chunks\ssr\[root-of-the-server]__d2aadae6._.js:1:5717) {
+  digest: '2606695053'
+}
+Export encountered an error on /login/page: /login, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null

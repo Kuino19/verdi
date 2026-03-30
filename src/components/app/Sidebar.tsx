@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
+import { auth } from "@/lib/firebase/client";
+import { signOut } from "firebase/auth";
+import { BookMarked as BookMarkedIcon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -16,17 +19,16 @@ import {
   Trophy,
   Settings,
   LogOut,
-  ChevronLeft,
   Gavel,
-  Zap
+  X
 } from "lucide-react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 const menuItems = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { name: "Cases", icon: BookOpen, href: "/cases" },
   { name: "AI Assistant", icon: BrainCircuit, href: "/assistant" },
-  { name: "Exam Gen", icon: FileQuestion, href: "/exam-generator" },
+  { name: "Exam Generator", icon: FileQuestion, href: "/exam-generator" },
   { name: "CaseFlow", icon: Network, href: "/caseflow" },
   { name: "Flashcards", icon: Layers, href: "/flashcards" },
   { name: "Study Planner", icon: Calendar, href: "/study-planner" },
@@ -36,93 +38,117 @@ const menuItems = [
   { name: "Leaderboard", icon: Trophy, href: "/leaderboard" },
 ];
 
-import { BookMarked as BookMarkedIcon } from "lucide-react";
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const router = useRouter();
 
-  return (
-    <motion.aside 
-      animate={{ width: isCollapsed ? 80 : 260 }}
-      className="fixed left-0 top-0 bottom-0 z-40 glass-dark border-r border-white/5 flex flex-col transition-all duration-300"
-    >
-      {/* Logo Section */}
-      <div className="p-6 flex items-center justify-between">
-        {!isCollapsed && (
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Gavel className="w-6 h-6 text-primary" />
-            <span className="text-xl font-black tracking-tighter text-gradient">VERDI</span>
-          </Link>
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      await fetch("/api/auth/session", { method: "DELETE" });
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Sign out error", error);
+    }
+  };
+
+  const NavContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-5 py-5 flex items-center justify-between flex-shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-2.5" onClick={onClose}>
+          <Gavel className="w-5 h-5 text-primary" />
+          <span className="text-lg font-bold tracking-tight text-gradient">VERDI</span>
+        </Link>
+        {onClose && (
+          <button onClick={onClose} className="md:hidden p-1 rounded-lg text-muted hover:text-foreground transition-colors">
+            <X className="w-4 h-4" />
+          </button>
         )}
-        {isCollapsed && <Gavel className="w-6 h-6 text-primary mx-auto" />}
-        <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-1.5 hover:bg-white/5 rounded-lg transition-colors md:flex hidden"
-        >
-          <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? "rotate-180" : ""}`} />
-        </button>
       </div>
 
-      {/* Nav Items */}
-      <nav className="flex-grow px-3 py-4 space-y-1 overflow-y-auto no-scrollbar">
-        {menuItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link key={item.name} href={item.href}>
-              <div className={`
-                flex items-center gap-3 p-3 rounded-xl transition-all relative group
-                ${isActive ? "bg-primary/20 text-primary" : "text-muted hover:bg-white/5 hover:text-foreground"}
-                ${isCollapsed ? "justify-center" : ""}
-              `}>
-                <item.icon className={`w-5 h-5 ${isActive ? "text-primary" : "text-muted group-hover:text-foreground"}`} />
-                {!isCollapsed && <span className="text-sm font-bold tracking-tight">{item.name}</span>}
-                {isActive && (
-                  <motion.div 
-                    layoutId="active-pill" 
-                    className="absolute left-0 w-1 h-6 bg-primary rounded-r-full"
-                  />
-                )}
-                
-                {isCollapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 glass text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                    {item.name}
-                  </div>
-                )}
-              </div>
-            </Link>
-          );
-        })}
+      {/* Nav */}
+      <nav className="flex-grow px-3 overflow-y-auto no-scrollbar">
+        <div className="space-y-0.5">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link key={item.name} href={item.href} onClick={onClose}>
+                <div className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all relative
+                  ${isActive
+                    ? "bg-white/8 text-foreground"
+                    : "text-muted hover:bg-white/5 hover:text-foreground"
+                  }
+                `}>
+                  <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-primary" : ""}`} />
+                  <span className="text-sm">{item.name}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="sidebar-active"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-primary rounded-r-full"
+                    />
+                  )}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
-      {/* Bottom Section */}
-      <div className="p-4 mt-auto space-y-2">
-        {!isCollapsed && (
-           <div className="p-4 glass rounded-2xl border-primary/20 bg-gradient-to-br from-primary/10 to-transparent mb-4">
-              <div className="flex items-center gap-2 text-primary font-black text-[10px] uppercase mb-2">
-                <Zap className="w-3 h-3 fill-current" />
-                Upgrade to Pro
-              </div>
-              <p className="text-[10px] text-muted italic mb-3">Get unlimited AI Assistant & Exam Generator.</p>
-              <Link href="/upgrade" className="block text-center py-2 bg-primary text-background text-[10px] font-black rounded-lg">
-                View Plans
-              </Link>
-           </div>
-        )}
-        
-        <Link href="/settings">
-          <div className={`flex items-center gap-3 p-3 rounded-xl text-muted hover:bg-white/5 transition-all ${isCollapsed ? "justify-center" : ""}`}>
-            <Settings className="w-5 h-5" />
-            {!isCollapsed && <span className="text-sm font-bold tracking-tight">Settings</span>}
+      {/* Footer */}
+      <div className="px-3 pb-4 pt-3 border-t border-white/[0.06] flex-shrink-0 space-y-0.5">
+        <Link href="/settings" onClick={onClose}>
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted hover:bg-white/5 hover:text-foreground transition-all">
+            <Settings className="w-4 h-4" />
+            <span className="text-sm">Settings</span>
           </div>
         </Link>
-        <Link href="/">
-          <div className={`flex items-center gap-3 p-3 rounded-xl text-rose-400 hover:bg-rose-400/10 transition-all ${isCollapsed ? "justify-center" : ""}`}>
-            <LogOut className="w-5 h-5" />
-            {!isCollapsed && <span className="text-sm font-bold tracking-tight">Logout</span>}
-          </div>
-        </Link>
+        <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted hover:bg-white/5 hover:text-rose-400 transition-all">
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm">Sign out</span>
+        </button>
       </div>
-    </motion.aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 z-40 w-[240px] flex-col border-r border-white/[0.06] bg-[#080E1C]">
+        <NavContent />
+      </aside>
+
+      {/* Mobile Drawer */}
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-40 bg-black/50 md:hidden"
+              onClick={onClose}
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              className="fixed left-0 top-0 bottom-0 z-50 w-[260px] flex flex-col border-r border-white/[0.06] bg-[#080E1C] md:hidden"
+            >
+              <NavContent />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

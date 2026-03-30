@@ -13,6 +13,9 @@ import {
   ArrowRight
 } from "lucide-react";
 import Link from "next/link";
+import { auth, db } from "@/lib/firebase/client";
+import { doc, updateDoc } from "firebase/firestore";
+import { useRouter } from "next/navigation";
 
 const levels = ["100 Level", "200 Level", "300 Level", "400 Level", "500 Level"];
 const subjects = [
@@ -39,6 +42,27 @@ export default function OnboardingPage() {
   const [selectedLevel, setSelectedLevel] = useState("");
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedGoal, setSelectedGoal] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const router = useRouter();
+
+  const handleFinish = async () => {
+    setIsSaving(true);
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        await updateDoc(doc(db, "users", user.uid), {
+          level: selectedLevel,
+          subjects: selectedSubjects,
+          study_goal: selectedGoal
+        });
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error("Failed to save onboarding data:", error);
+      setIsSaving(false);
+    }
+  };
 
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => s - 1);
@@ -214,12 +238,13 @@ export default function OnboardingPage() {
                 <span className="text-xl font-bold">{selectedGoal} — {goals.find(g => g.label === selectedGoal)?.time}</span>
               </div>
 
-              <Link 
-                href="/dashboard" 
+              <button 
+                onClick={handleFinish}
+                disabled={isSaving}
                 className="w-full py-5 bg-primary text-background font-black rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2"
               >
-                Go to Dashboard <ArrowRight className="w-5 h-5" />
-              </Link>
+                {isSaving ? "Preparing Dashboard..." : <>Go to Dashboard <ArrowRight className="w-5 h-5" /></>}
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

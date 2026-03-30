@@ -16,11 +16,16 @@ import {
   Gavel,
   Zap
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
+import { useUserContext } from "@/components/app/UserContext";
+import { auth } from "@/lib/firebase/client";
+import { signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 interface SettingItem {
   label: string;
-  icon: any;
+  icon: LucideIcon;
   value: string;
   color?: string;
   action?: () => void;
@@ -33,13 +38,26 @@ interface SettingSection {
 
 export default function SettingsPage() {
   const [theme, setTheme] = useState("dark");
+  const { userName, university } = useUserContext();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      await fetch("/api/auth/session", { method: "DELETE" });
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Sign out error", error);
+    }
+  };
 
   const sections: SettingSection[] = [
     {
       title: "Account",
       items: [
-        { label: "Profile Information", icon: User, value: "Adeyemi Lawal" },
-        { label: "Connected University", icon: Gavel, value: "University of Lagos" },
+        { label: "Profile Information", icon: User, value: userName },
+        { label: "Connected University", icon: Gavel, value: university },
         { label: "Security & Password", icon: Shield, value: "Changed 2 months ago" }
       ]
     },
@@ -102,7 +120,7 @@ export default function SettingsPage() {
         ))}
 
         <div className="pt-6">
-           <button className="w-full flex items-center gap-4 p-6 glass rounded-2xl border-rose-500/20 text-rose-500 hover:bg-rose-500/10 transition-all font-bold">
+           <button onClick={handleSignOut} className="w-full flex items-center gap-4 p-6 glass rounded-2xl border-rose-500/20 text-rose-500 hover:bg-rose-500/10 transition-all font-bold">
               <LogOut className="w-5 h-5" />
               Sign Out of VERDI
            </button>
