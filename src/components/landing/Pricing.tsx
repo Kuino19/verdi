@@ -82,32 +82,32 @@ export default function Pricing() {
 
       <div className="container">
         {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-20">
+        <div className="text-center max-w-2xl mx-auto mb-16">
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 glass rounded-full mb-6 border border-primary/20 text-xs font-black tracking-widest text-primary uppercase"
+            className="inline-flex items-center gap-2 px-3 py-1 bg-white/[0.05] border border-white/[0.08] rounded-full mb-6 text-[10px] font-bold tracking-widest text-primary uppercase"
           >
-            <Sparkles className="w-3.5 h-3.5" /> Pricing
+            <Sparkles className="w-3.5 h-3.5" /> PRICING
           </motion.div>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.05 }}
-            className="text-4xl md:text-5xl font-bold mb-5 italic"
+            className="text-3xl md:text-5xl font-bold mb-5 tracking-tight"
           >
-            Accessible <span className="text-gradient">Pricing</span>
+            Simple, <span className="text-gradient">Flexible</span> Pricing
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-lg text-muted"
+            className="text-muted leading-relaxed"
           >
-            Simple, student-friendly plans. No long-term commitments, no hidden fees.
+            Choose the plan that fits your study pace. No hidden fees.
           </motion.p>
 
           <motion.div
@@ -115,51 +115,50 @@ export default function Pricing() {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: 0.15 }}
-            className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 glass rounded-full text-sm font-bold text-amber-400 border border-amber-500/20"
+            className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-amber-500/5 rounded-full text-xs font-semibold text-amber-200/80 border border-amber-500/10"
           >
-            <Info className="w-4 h-4 flex-shrink-0" />
-            Try our 3-day access plan for just{" "}
-            <span className="text-amber-300 font-black">₦500</span>
+            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+            Limited time: 3-day access for just{" "}
+            <span className="text-amber-400 font-bold">₦500</span>
           </motion.div>
         </div>
 
         {/* Cards */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 xl:gap-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map((plan, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 30 }}
+              initial={{ opacity: 0, y: 25 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -6, transition: { duration: 0.25 } }}
-              className={`relative p-7 xl:p-8 glass rounded-[28px] border flex flex-col h-full transition-all duration-300 ${plan.pro ? glowMap[plan.color] : "border-white/5 hover:border-white/10"}`}
+              className={`relative p-8 bg-white/[0.02] border rounded-[32px] flex flex-col h-full transition-all duration-300 ${plan.pro ? "border-primary/20 bg-primary/[0.02]" : "border-white/[0.06]"}`}
             >
               {/* Popular/Best Value badge */}
               {plan.badge && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap px-5 py-1.5 bg-primary text-background text-[11px] font-black uppercase tracking-widest rounded-full shadow-[0_0_20px_rgba(201,162,39,0.4)]">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-primary text-background text-[10px] font-bold uppercase tracking-wider rounded-full shadow-[0_4px_16px_rgba(201,162,39,0.2)]">
                   {plan.badge}
                 </div>
               )}
 
               {/* Price block */}
-              <div className="mb-8 pt-2">
-                <h3 className="text-xs font-black text-muted uppercase tracking-widest mb-3">{plan.name}</h3>
-                <div className="flex items-end gap-2 mb-3">
-                  <span className="text-5xl font-black">{plan.price}</span>
-                  <span className="text-sm text-muted pb-2">{plan.period}</span>
+              <div className="mb-8">
+                <h3 className="text-[10px] font-bold text-muted uppercase tracking-widest mb-3">{plan.name}</h3>
+                <div className="flex items-end gap-1.5 mb-2">
+                  <span className="text-4xl font-bold">{plan.price}</span>
+                  <span className="text-xs text-muted pb-1.5">{plan.period}</span>
                 </div>
-                <p className="text-sm text-muted/80 italic">&ldquo;{plan.description}&rdquo;</p>
+                <p className="text-xs text-muted leading-relaxed opacity-80">{plan.description}</p>
               </div>
 
               {/* Features */}
               <ul className="space-y-3.5 mb-10 flex-grow">
                 {plan.features.map((feature, fIndex) => (
                   <li key={fIndex} className="flex items-start gap-3 text-sm">
-                    <div className={`w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 ${plan.pro ? "bg-primary/15" : "bg-emerald-500/15"}`}>
+                    <div className={`w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5 ${plan.pro ? "bg-primary/20" : "bg-emerald-500/15"}`}>
                       <Check className={`w-3 h-3 ${colorMap[plan.color]}`} />
                     </div>
-                    <span className="text-foreground/80">{feature}</span>
+                    <span className="text-muted text-xs md:text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -167,10 +166,10 @@ export default function Pricing() {
               {/* CTA */}
               <Link
                 href={plan.href}
-                className={`w-full py-4 rounded-2xl font-black text-sm text-center transition-all flex items-center justify-center gap-2 ${
+                className={`w-full py-4 rounded-2xl font-bold text-sm text-center transition-all flex items-center justify-center gap-2 ${
                   plan.pro
-                    ? "bg-primary text-background shadow-[0_0_30px_rgba(201,162,39,0.3)] hover:scale-[1.02] active:scale-[0.98]"
-                    : "glass hover:bg-white/5 border border-white/10"
+                    ? "bg-primary text-background shadow-[0_8px_30px_rgba(201,162,39,0.25)]"
+                    : "bg-white/[0.05] hover:bg-white/[0.08] text-foreground border border-white/[0.08]"
                 }`}
               >
                 {plan.pro && <Zap className="w-4 h-4" />}

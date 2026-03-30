@@ -17,9 +17,6 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "VERDI | Simplifying Legal Learning",
   description: "VERDI is a legal-tech platform designed to help students understand complex legal materials and prepare for exams.",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export const viewport: Viewport = {

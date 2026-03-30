@@ -96,7 +96,7 @@ export default function Features() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 text-primary rounded-full mb-6 text-xs font-black uppercase tracking-widest"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 border border-primary/20 text-primary rounded-full mb-6 text-xs font-bold tracking-tight"
           >
             <Zap className="w-3.5 h-3.5 fill-current" />
             Powerful Tools
@@ -106,17 +106,16 @@ export default function Features() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-4xl md:text-5xl font-bold mb-6 leading-tight"
+            className="text-3xl md:text-5xl font-bold mb-6 tracking-tight leading-tight"
           >
-            Everything a Modern{" "}
-            <span className="text-gradient italic">Law Student</span> Needs
+            Everything a Modern Law Student Needs
           </motion.h2>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-lg text-muted leading-relaxed"
+            className="text-muted leading-relaxed"
           >
             VERDI combines academic accuracy with cutting-edge AI to give you a 
             significant competitive edge in your legal education.
@@ -128,25 +127,25 @@ export default function Features() {
           initial="hidden"
           whileInView="show"
           viewport={{ once: true }}
-          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="grid md:grid-cols-2 lg:grid-cols-3 gap-5"
         >
           {features.map((feature, index) => (
             <motion.div 
               key={index} 
               variants={item}
-              className={`group p-8 glass rounded-3xl border-white/5 ${feature.border} ${feature.glow} transition-all duration-300 relative overflow-hidden`}
+              className={`group p-8 glass rounded-[32px] border-white/5 ${feature.border} transition-all duration-300 relative overflow-hidden`}
             >
               {/* Hover background glow */}
-              <div className={`absolute inset-0 ${feature.bg} opacity-0 group-hover:opacity-30 transition-opacity duration-500 rounded-3xl`} />
+              <div className={`absolute inset-0 ${feature.bg} opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl`} />
 
               <div className="relative z-10">
-                <div className={`w-14 h-14 rounded-2xl ${feature.bg} border border-white/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                  <feature.icon className={`w-7 h-7 ${feature.color}`} />
+                <div className={`w-12 h-12 rounded-2xl ${feature.bg} border border-white/5 flex items-center justify-center mb-6 transition-transform duration-300`}>
+                  <feature.icon className={`w-6 h-6 ${feature.color}`} />
                 </div>
-                <h3 className="text-xl font-bold mb-3 group-hover:text-foreground transition-colors">{feature.title}</h3>
-                <p className="text-muted text-sm leading-relaxed mb-6 italic">{feature.description}</p>
-                <div className={`flex items-center gap-2 ${feature.color} font-bold text-xs tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-[-8px] group-hover:translate-x-0`}>
-                  Explore Feature <ArrowRight className="w-4 h-4" />
+                <h3 className="text-lg font-bold mb-2 group-hover:text-foreground transition-colors">{feature.title}</h3>
+                <p className="text-muted text-sm leading-[1.6] mb-6">{feature.description}</p>
+                <div className={`flex items-center gap-2 ${feature.color} font-bold text-[10px] tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-[-8px] group-hover:translate-x-0`}>
+                  Learn More <ArrowRight className="w-4 h-4" />
                 </div>
               </div>
             </motion.div>
@@ -155,43 +154,32 @@ export default function Features() {
 
         {/* Pro CTA Banner */}
         <motion.div 
-          initial={{ opacity: 0, scale: 0.97 }}
+          initial={{ opacity: 0, scale: 0.98 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
-          className="mt-20 relative overflow-hidden rounded-[40px]"
-          style={{
-            background: "linear-gradient(135deg, rgba(201,162,39,0.15) 0%, rgba(15,23,42,0.95) 60%, rgba(59,130,246,0.08) 100%)",
-            border: "1px solid rgba(201,162,39,0.2)"
-          }}
+          className="mt-20 relative overflow-hidden rounded-[40px] border border-primary/20 bg-primary/[0.03] backdrop-blur-sm"
         >
-          <div className="absolute inset-0 opacity-5"
-            style={{
-              backgroundImage: `radial-gradient(circle, #C9A227 1px, transparent 1px)`,
-              backgroundSize: "32px 32px"
-            }}
-          />
           <div className="relative p-10 md:p-14 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="max-w-xl">
-              <div className="flex items-center gap-3 text-primary mb-4 font-black text-xs uppercase tracking-widest">
+            <div className="max-w-xl text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start gap-2.5 text-primary mb-4 font-bold text-xs tracking-tight">
                 <Zap className="w-4 h-4 fill-current" />
-                <span>Pro Exclusive Feature</span>
+                <span>Pro Exclusive</span>
               </div>
-              <h3 className="text-3xl md:text-4xl font-bold mb-4 italic leading-tight">
-                Generate exams from <br />
-                <span className="text-gradient">YOUR lecture notes.</span>
+              <h3 className="text-2xl md:text-4xl font-bold mb-4 tracking-tight leading-tight">
+                Transform your <span className="text-gradient">lecture notes</span> into personalized exams.
               </h3>
-              <p className="text-muted leading-relaxed">
-                Upload a PDF of your lecture handout and VERDI Pro will generate a mock exam 
-                matching your lecturer&apos;s questioning style and focus areas.
+              <p className="text-muted text-sm md:text-base leading-relaxed">
+                Upload your lecture handouts and let VERDI Pro build mock exams 
+                matching your faculty&apos;s style.
               </p>
             </div>
-            <div className="flex flex-col gap-3 flex-shrink-0">
+            <div className="flex flex-col gap-3 flex-shrink-0 w-full md:w-auto">
               <Link 
                 href="/register" 
-                className="inline-flex items-center justify-center gap-2 px-10 py-5 bg-primary text-background font-extrabold rounded-2xl hover:scale-105 active:scale-95 transition-all whitespace-nowrap shadow-[0_10px_30px_rgba(201,162,39,0.3)]"
+                className="inline-flex items-center justify-center gap-2 px-10 py-5 bg-primary text-background font-bold rounded-2xl hover:scale-105 active:scale-95 transition-all whitespace-nowrap shadow-[0_8px_30px_rgba(201,162,39,0.25)]"
               >
-                Try Pro Generator
+                Get Pro Generator
               </Link>
               <button className="flex items-center justify-center gap-1 text-xs text-muted hover:text-foreground transition-colors font-bold">
                 See how it works <ChevronRight className="w-3.5 h-3.5" />

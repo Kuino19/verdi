@@ -62,7 +62,7 @@ export default function Navbar() {
           </Link>
           <Link
             href="/register"
-            className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-background text-sm font-black rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_0_24px_rgba(201,162,39,0.35)]"
+            className="flex items-center gap-1.5 px-5 py-2.5 bg-primary text-background text-sm font-bold rounded-full hover:scale-105 active:scale-95 transition-all shadow-[0_4px_20px_rgba(201,162,39,0.25)]"
           >
             Get Started
             <ChevronRight className="w-4 h-4" />

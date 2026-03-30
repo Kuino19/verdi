@@ -28,7 +28,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold mb-6 uppercase tracking-widest text-xs">Platform</h4>
+            <h4 className="font-bold mb-6 text-[10px] uppercase tracking-wider text-muted/60">Platform</h4>
             <ul className="space-y-4">
               <li><Link href="#features" className="text-sm text-muted hover:text-primary transition-colors">Case Summaries</Link></li>
               <li><Link href="#features" className="text-sm text-muted hover:text-primary transition-colors">AI Assistant</Link></li>
@@ -38,7 +38,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold mb-6 uppercase tracking-widest text-xs">Community</h4>
+            <h4 className="font-bold mb-6 text-[10px] uppercase tracking-wider text-muted/60">Community</h4>
             <ul className="space-y-4">
               <li><Link href="#ambassador" className="text-sm text-muted hover:text-primary transition-colors">Ambassador Program</Link></li>
               <li><Link href="#" className="text-sm text-muted hover:text-primary transition-colors">Discussions</Link></li>
@@ -48,7 +48,7 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold mb-6 uppercase tracking-widest text-xs">Support</h4>
+            <h4 className="font-bold mb-6 text-[10px] uppercase tracking-wider text-muted/60">Support</h4>
             <ul className="space-y-4">
               <li><Link href="#" className="text-sm text-muted hover:text-primary transition-colors">Pricing</Link></li>
               <li><Link href="#" className="text-sm text-muted hover:text-primary transition-colors">Help Center</Link></li>
@@ -58,12 +58,12 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs text-muted">© {new Date().getFullYear()} VERDI Legal Technologies. All rights reserved.</p>
+        <div className="pt-8 border-t border-white/[0.05] flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-[10px] text-muted opacity-60 italic">© {new Date().getFullYear()} VERDI Legal Technologies. All rights reserved.</p>
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-1 text-[10px] font-bold text-muted uppercase tracking-widest">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              All Systems Operational
+            <div className="flex items-center gap-2 text-[10px] font-bold text-muted/40 uppercase tracking-widest">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
+              Pulse Active
             </div>
           </div>
         </div>

@@ -71,23 +71,23 @@ function StatCard({ stat, index }: { stat: typeof stats[0]; index: number }) {
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ delay: index * 0.12, duration: 0.6 }}
-      className={`p-8 glass rounded-3xl border-white/5 ${stat.border} text-center flex flex-col items-center group hover:scale-[1.03] transition-all duration-300 relative overflow-hidden`}
+      transition={{ delay: index * 0.1, duration: 0.5 }}
+      className={`p-8 bg-white/[0.02] border border-white/[0.06] rounded-[32px] ${stat.border} text-center flex flex-col items-center group transition-all duration-300 relative overflow-hidden`}
     >
       {/* Background glow on hover */}
-      <div className={`absolute inset-0 ${stat.bg} opacity-0 group-hover:opacity-50 transition-opacity rounded-3xl`} />
+      <div className={`absolute inset-0 ${stat.bg} opacity-0 group-hover:opacity-30 transition-opacity rounded-3xl`} />
 
       <div className="relative z-10">
-        <div className={`w-14 h-14 rounded-2xl ${stat.bg} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
-          <stat.icon className={`w-7 h-7 ${stat.color}`} />
+        <div className={`w-12 h-12 rounded-2xl ${stat.bg} flex items-center justify-center mb-5 transition-transform duration-300`}>
+          <stat.icon className={`w-6 h-6 ${stat.color}`} />
         </div>
-        <h4 className={`text-4xl font-black mb-2 tracking-tighter ${stat.color}`}>
+        <h4 className={`text-3xl font-bold mb-1 tracking-tight ${stat.color}`}>
           {stat.display}
         </h4>
-        <p className="text-sm font-bold text-foreground mb-1 uppercase tracking-widest">{stat.label}</p>
-        <p className="text-xs text-muted italic">{stat.sub}</p>
+        <p className="text-sm font-semibold text-foreground mb-1">{stat.label}</p>
+        <p className="text-xs text-muted italic opacity-80">{stat.sub}</p>
       </div>
     </motion.div>
   );
@@ -98,36 +98,32 @@ export default function Stats() {
   const isInView = useInView(ref, { once: true });
 
   return (
-    <section className="py-24 relative overflow-hidden bg-slate-900/40">
-      {/* Top/Bottom edge gradients */}
-      <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-      <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-
+    <section className="py-20 relative overflow-hidden">
       <div className="container" ref={ref}>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
           {stats.map((stat, i) => <StatCard key={i} stat={stat} index={i} />)}
         </div>
 
         {/* Market insight quote */}
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ delay: 0.5 }}
-          className="p-10 md:p-12 glass rounded-[40px] border-white/5 text-center max-w-4xl mx-auto relative"
+          transition={{ delay: 0.4 }}
+          className="p-8 md:p-10 bg-white/[0.02] border border-white/[0.06] rounded-[40px] text-center max-w-3xl mx-auto relative"
         >
-          <Quote className="w-8 h-8 text-primary/30 mx-auto mb-6" />
-          <p className="text-muted text-lg leading-relaxed italic">
-            Nigeria currently has more than{" "}
-            <span className="text-foreground font-bold not-italic">60 universities</span>{" "}
+          <Quote className="w-6 h-6 text-primary/20 mx-auto mb-5" />
+          <p className="text-muted leading-relaxed">
+            Nigeria has more than{" "}
+            <span className="text-foreground font-semibold">60 universities</span>{" "}
             offering law degrees. Each faculty admits between{" "}
-            <span className="text-foreground font-bold not-italic">100–300 students</span>{" "}
+            <span className="text-foreground font-semibold">100–300 students</span>{" "}
             per level. Even modest adoption rates represent a{" "}
-            <span className="text-primary font-bold not-italic">massive opportunity.</span>
+            <span className="text-primary font-semibold">massive opportunity.</span>
           </p>
-          <div className="mt-8 flex items-center justify-center gap-4 text-xs font-black text-primary tracking-[0.25em] uppercase">
-            <span className="block w-12 h-[1px] bg-gradient-to-r from-transparent to-primary" />
-            Market Analysis Report — 2025
-            <span className="block w-12 h-[1px] bg-gradient-to-l from-transparent to-primary" />
+          <div className="mt-6 flex items-center justify-center gap-3 text-[10px] font-bold text-primary/40 uppercase tracking-widest">
+            <span className="block w-8 h-[1px] bg-primary/20" />
+            Market Analysis Report 2025
+            <span className="block w-8 h-[1px] bg-primary/20" />
           </div>
         </motion.div>
       </div>

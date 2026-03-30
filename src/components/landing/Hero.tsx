@@ -105,7 +105,7 @@ export default function Hero() {
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 href="/register"
-                className="flex items-center justify-center gap-2 px-8 py-4 bg-primary text-background font-extrabold rounded-2xl hover:scale-105 transition-all shadow-[0_10px_40px_rgba(201,162,39,0.4)]"
+                className="flex items-center justify-center gap-2 px-8 py-4 bg-primary text-background font-bold rounded-2xl hover:scale-105 transition-all shadow-[0_8px_30px_rgba(201,162,39,0.25)]"
               >
                 Get Started Free <ArrowRight className="w-5 h-5" />
               </Link>
@@ -248,14 +248,14 @@ export default function Hero() {
             <FloatingBadge
               delay={0.9}
               zIndex={20}
-              className="absolute -bottom-10 -right-8 w-[90px] h-[90px] flex flex-col items-center justify-center rounded-2xl ring-1 ring-emerald-500/40"
+              className="absolute -bottom-10 -right-8 w-[90px] h-[90px] flex flex-col items-center justify-center rounded-2xl ring-1 ring-emerald-500/30"
               style={{
                 ...badgeBase,
-                boxShadow: "0 0 28px rgba(16,185,129,0.5)",
+                boxShadow: "0 0 20px rgba(16,185,129,0.3)",
               } as React.CSSProperties}
             >
-              <Gavel className="w-10 h-10 text-emerald-400" style={{ filter: "drop-shadow(0 0 8px rgba(16,185,129,0.9))" }} />
-              <span className="text-[8px] font-black text-emerald-400 mt-0.5 tracking-wider">VERDICTS</span>
+              <Gavel className="w-10 h-10 text-emerald-400" />
+              <span className="text-[8px] font-bold text-emerald-400 mt-0.5 tracking-wider">VERDICTS</span>
             </FloatingBadge>
 
             {/* ── AI Online pill — mid left, safely inside the column ── */}
