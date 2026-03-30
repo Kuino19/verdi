@@ -59,7 +59,11 @@ export default function Footer() {
         </div>
 
         <div className="pt-8 border-t border-white/[0.05] flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-[10px] text-muted opacity-60 italic">© {new Date().getFullYear()} VERDI Legal Technologies. All rights reserved.</p>
+          <p className="text-[10px] text-muted opacity-60 italic">
+            © {new Date().getFullYear()} VERDI Legal Technologies. All rights reserved. 
+            <span className="mx-2 text-primary/40">•</span> 
+            Made with ❤️ by <span className="text-primary font-bold shadow-sm">Kuino</span>
+          </p>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 text-[10px] font-bold text-muted/40 uppercase tracking-widest">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />

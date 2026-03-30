@@ -114,6 +114,9 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <LogOut className="w-4 h-4" />
           <span className="text-sm">Sign out</span>
         </button>
+        <div className="text-[10px] text-center pt-4 text-muted/30 font-bold uppercase tracking-widest pointer-events-none">
+          Made by <span className="text-primary/50">Kuino</span>
+        </div>
       </div>
     </div>
   );
