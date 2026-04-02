@@ -7,27 +7,57 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useUserContext } from "@/components/app/UserContext";
+import { useState, useEffect } from "react";
+import { fetchUserTasks, updateTaskState } from "@/lib/firebase/db";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-const data = [
-  { name: 'Mon', hours: 2.5 },
-  { name: 'Tue', hours: 4.1 },
-  { name: 'Wed', hours: 3.8 },
-  { name: 'Thu', hours: 5.2 },
-  { name: 'Fri', hours: 3.0 },
-  { name: 'Sat', hours: 1.5 },
-  { name: 'Sun', hours: 2.0 },
+const masteryData = [
+  { subject: 'Tort', score: 85, full: 100 },
+  { subject: 'Contract', score: 62, full: 100 },
+  { subject: 'Criminal', score: 91, full: 100 },
+  { subject: 'Company', score: 45, full: 100 },
+  { subject: 'Constitutional', score: 78, full: 100 },
 ];
 
-const stats = [
+const statsTemplate = [
   { label: "Cases Studied", value: "48", icon: BookMarked, color: "text-primary" },
   { label: "Study Hours", value: "142h", icon: Clock, color: "text-emerald-400" },
   { label: "Practice Tests", value: "15", icon: TrendingUp, color: "text-blue-400" },
-  { label: "Global Rank", value: "#124", icon: Trophy, color: "text-amber-400" },
+  { label: "XP Points", value: "0", icon: Trophy, color: "text-amber-400" },
 ];
 
 export default function DashboardPage() {
-  const { userName } = useUserContext();
+  const { uid, userName, streak, points, isPremium } = useUserContext();
+  const [tasks, setTasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (uid) {
+      fetchUserTasks(uid).then((res) => {
+        if (res.length > 0) setTasks(res);
+        else setTasks([
+          { id: "1", task: "Complete 100L Quiz", done: false },
+          { id: "2", task: "Review Carlill via CaseFlow", done: false },
+        ]);
+      });
+    }
+  }, [uid]);
+
+  const toggleTask = async (taskId: string, currentStatus: boolean) => {
+    // Optimistic UI update
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, done: !currentStatus } : t));
+    try {
+      if (taskId.length > 10) await updateTaskState(uid, taskId, !currentStatus);
+    } catch (e) {
+      console.error(e);
+      // Revert if error
+      setTasks(tasks.map(t => t.id === taskId ? { ...t, done: currentStatus } : t));
+    }
+  };
+
+  const stats = [
+    ...statsTemplate.slice(0, 3),
+    { label: "XP Points", value: points.toLocaleString(), icon: Trophy, color: "text-amber-400" },
+  ];
 
   return (
     <div className="space-y-8">
@@ -43,12 +73,12 @@ export default function DashboardPage() {
       {/* Streak + Points — compact */}
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
-          <Flame className="w-4 h-4 text-orange-400 fill-orange-400" />
-          <span className="text-sm font-semibold">12-day streak</span>
+          <Flame className={`w-4 h-4 ${streak > 0 ? "text-orange-400 fill-orange-400" : "text-muted"}`} />
+          <span className="text-sm font-semibold">{streak}-day streak</span>
         </div>
         <div className="flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold">4,250 points</span>
+          <Trophy className={`w-4 h-4 ${points > 0 ? "text-primary" : "text-muted"}`} />
+          <span className="text-sm font-semibold">{points.toLocaleString()} points</span>
         </div>
       </div>
 
@@ -75,39 +105,64 @@ export default function DashboardPage() {
         {/* Left: Chart + Recent */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Activity Chart */}
-          <div className="p-5 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
-            <div className="flex items-center justify-between mb-5">
+          {/* Activity Heatmap */}
+          <div className="p-8 bg-white/[0.03] border border-white/[0.06] rounded-[32px]">
+            <div className="flex items-center justify-between mb-8">
               <div>
-                <p className="font-semibold text-sm">Study Activity</p>
-                <p className="text-xs text-muted mt-0.5">This week</p>
+                <p className="font-bold text-lg italic">Consistency <span className="text-primary italic">Heatmap</span></p>
+                <p className="text-xs text-muted mt-1">Your daily study frequency over the last 90 days.</p>
               </div>
-              <select className="bg-white/5 border border-white/[0.06] rounded-lg px-2.5 py-1.5 text-xs text-muted focus:outline-none">
-                <option>7 days</option>
-                <option>30 days</option>
-              </select>
+              <div className="flex items-center gap-2">
+                 <div className="w-3 h-3 rounded-sm bg-white/5" />
+                 <span className="text-[10px] text-muted uppercase font-black">Free</span>
+                 <div className="w-3 h-3 rounded-sm bg-primary/40" />
+                 <div className="w-3 h-3 rounded-sm bg-primary" />
+                 <span className="text-[10px] text-muted uppercase font-black">Grind</span>
+              </div>
             </div>
-            <div className="h-[180px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data} barSize={24}>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
-                  <YAxis hide />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '10px', fontSize: '11px', color: '#fff' }}
-                  />
-                  <Bar dataKey="hours" radius={[4, 4, 0, 0]}>
-                    {data.map((_, index) => (
-                      <Cell key={index} fill={index === 3 ? '#C9A227' : 'rgba(201,162,39,0.18)'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            
+            <div className="flex flex-wrap gap-2 overflow-x-auto no-scrollbar py-2">
+               {Array.from({ length: 90 }).map((_, i) => {
+                 const date = new Date();
+                 date.setDate(date.getDate() - (89 - i));
+                 const dateStr = date.toISOString().split("T")[0];
+                 const isActive = useUserContext().activityLog?.includes(dateStr);
+                 
+                 return (
+                   <div 
+                     key={i}
+                     title={dateStr}
+                     className={`w-3.5 h-3.5 md:w-4 md:h-4 rounded-sm transition-all hover:scale-125 cursor-help ${
+                       isActive ? "bg-primary shadow-[0_0_8px_rgba(201,162,39,0.4)]" : "bg-white/5"
+                     }`}
+                   />
+                 );
+               })}
             </div>
           </div>
 
-          {/* Recent Cases + Exams */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-6">
+            {/* Subject Mastery Radar/Bar */}
+            <div className="p-8 bg-white/[0.03] border border-white/[0.06] rounded-[32px]">
+              <p className="text-sm font-bold mb-6 uppercase tracking-widest text-muted">Subject Mastery</p>
+              <div className="space-y-4">
+                {masteryData.map((m, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-wider">
+                      <span>{m.subject}</span>
+                      <span className="text-primary">{m.score}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                       <motion.div 
+                         initial={{ width: 0 }}
+                         animate={{ width: `${m.score}%` }}
+                         className="h-full bg-primary"
+                       />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="p-5 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
               <p className="text-sm font-semibold mb-4">Recent Cases</p>
               <div className="space-y-2">
@@ -165,16 +220,30 @@ export default function DashboardPage() {
             </Link>
           </div>
 
+          {/* Reward Shop Teaser */}
+          <div className="p-5 bg-emerald-500/[0.07] border border-emerald-500/10 rounded-2xl group hover:border-emerald-500/30 transition-all cursor-pointer">
+            <Link href="/rewards">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                   <Trophy className="w-4 h-4 text-emerald-500" />
+                   <p className="text-sm font-semibold">Reward Center</p>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-emerald-500 group-hover:translate-x-1 transition-transform" />
+              </div>
+              <p className="text-[10px] text-muted italic mb-4">Trade your XP for Premium and more.</p>
+              <div className="flex -space-x-1">
+                 <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/20" />
+                 <div className="w-5 h-5 rounded-full bg-emerald-500/40 border border-emerald-500/20" />
+                 <div className="w-5 h-5 rounded-full bg-emerald-500/60 border border-emerald-500/20" />
+              </div>
+            </Link>
+          </div>
+
           <div className="p-5 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
             <p className="text-sm font-semibold mb-4">Today's Tasks</p>
             <div className="space-y-3">
-              {[
-                { task: "Summarize 3 Tort cases", done: true },
-                { task: "Complete 100L Quiz", done: false },
-                { task: "Update Study Planner", done: false },
-                { task: "Review Carlill in CaseFlow", done: false },
-              ].map((t, i) => (
-                <label key={i} className="flex items-center gap-3 cursor-pointer group">
+              {tasks.map((t, i) => (
+                <label key={t.id || i} className="flex items-center gap-3 cursor-pointer group" onClick={(e) => { e.preventDefault(); toggleTask(t.id, t.done); }}>
                   <div className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 transition-all ${t.done ? 'bg-emerald-500 border-emerald-500' : 'border-white/20 group-hover:border-emerald-500/50'}`}>
                     {t.done && <Check className="w-2.5 h-2.5 text-white" />}
                   </div>

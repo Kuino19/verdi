@@ -20,7 +20,9 @@ import {
   Settings,
   LogOut,
   Gavel,
-  X
+  X,
+  Crown,
+  Gift
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -36,6 +38,9 @@ const menuItems = [
   { name: "Dictionary", icon: BookMarkedIcon, href: "/dictionary" },
   { name: "Community", icon: Users2, href: "/community" },
   { name: "Leaderboard", icon: Trophy, href: "/leaderboard" },
+  { name: "Rewards", icon: Gift, href: "/rewards" },
+  { name: "Mock Trial", icon: Gavel, href: "/moot-court" },
+  { name: "Subscription", icon: Crown, href: "/subscription" },
 ];
 
 interface SidebarProps {

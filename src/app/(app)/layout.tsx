@@ -23,6 +23,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Fetch user profile from Firestore
   let userName = decodedClaims.name || decodedClaims.email?.split("@")[0] || "Student";
   let university = "Nigerian University";
+  let isPremium = false;
+  let streak = 0;
+  let points = 0;
 
   try {
     const userDoc = await adminDb.collection("users").doc(decodedClaims.uid).get();
@@ -30,6 +33,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       const data = userDoc.data();
       if (data?.full_name) userName = data.full_name;
       if (data?.university) university = data.university;
+      if (typeof data?.isPremium === "boolean") isPremium = data.isPremium;
+      if (typeof data?.streak === "number") streak = data.streak;
+      if (typeof data?.points === "number") points = data.points;
     }
   } catch (e: any) {
     if (e.code === 7) {
@@ -40,7 +46,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <AppShell userName={userName} university={university} userEmail={decodedClaims.email || ""}>
+    <AppShell 
+      uid={decodedClaims.uid}
+      userName={userName} 
+      university={university} 
+      userEmail={decodedClaims.email || ""}
+      isPremium={isPremium}
+      streak={streak}
+      points={points}
+    >
       {children}
     </AppShell>
   );

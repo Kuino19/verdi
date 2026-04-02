@@ -10,46 +10,74 @@ import {
   HelpCircle,
   ArrowRight,
   Plus,
-  Zap
+  Zap,
+  Loader2
 } from "lucide-react";
-import { useState } from "react";
-
-const mockFlashcards = [
-  {
-    id: 1,
-    question: "What is the 'Rule in Rylands v Fletcher'?",
-    answer: "A person who for his own purposes brings on his lands and collects and keeps there anything likely to do mischief if it escapes, must keep it in at his peril.",
-    subject: "Tort Law",
-    deck: "Landmark Rules"
-  },
-  {
-    id: 2,
-    question: "What are the three certainties for a valid trust?",
-    answer: "1. Certainty of Intention\n2. Certainty of Subject Matter\n3. Certainty of Objects",
-    subject: "Equity & Trusts",
-    deck: "Exam Essentials"
-  },
-  {
-    id: 3,
-    question: "Define 'Animus Furandi'.",
-    answer: "An intention to steal; the intent to deprive the owner of property permanently.",
-    subject: "Criminal Law",
-    deck: "Latin Terms"
-  }
-];
+import { useState, useEffect } from "react";
+import { useUserContext } from "@/components/app/UserContext";
+import { db } from "@/lib/firebase/client";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 
 export default function FlashcardsPage() {
+  const { uid } = useUserContext();
+  const [flashcards, setFlashcards] = useState<any[]>([]);
+  const [decks, setDecks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [activeDeck, setActiveDeck] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
 
-  const currentCard = mockFlashcards[currentIndex];
+  useEffect(() => {
+    if (!uid) return;
+    const fetchCards = async () => {
+      try {
+        const q = query(collection(db, "users", uid, "flashcards"), orderBy("createdAt", "desc"));
+        const snap = await getDocs(q);
+        const cards = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        setFlashcards(cards);
+
+        // Group by deck
+        const deckMap: Record<string, { count: number, subject: string }> = {};
+        cards.forEach(card => {
+           if (!deckMap[card.deck]) deckMap[card.deck] = { count: 0, subject: card.subject || "General" };
+           deckMap[card.deck].count += 1;
+        });
+        
+        const generatedDecks = Object.keys(deckMap).map(deckName => ({
+           name: deckName,
+           count: deckMap[deckName].count,
+           subject: deckMap[deckName].subject,
+           color: "text-emerald-500",
+           bg: "bg-emerald-500/10"
+        }));
+        setDecks(generatedDecks);
+      } catch (err) {
+        console.error("Failed to load flashcards", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCards();
+  }, [uid]);
+
+  // Filter cards to active deck
+  const currentDeckCards = activeDeck ? flashcards.filter(c => c.deck === activeDeck) : [];
+  const currentCard = currentDeckCards[currentIndex] || null;
 
   const handleNext = () => {
     setIsFlipped(false);
     setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % mockFlashcards.length);
+      setCurrentIndex((prev) => (prev + 1) % currentDeckCards.length);
     }, 200);
+  };
+
+  const startDeck = (deckName: string) => {
+    setActiveDeck(deckName);
+    setCurrentIndex(0);
+    setSessionStarted(true);
+    setIsFlipped(false);
   };
 
   return (
@@ -66,42 +94,47 @@ export default function FlashcardsPage() {
 
       {!sessionStarted ? (
         <section className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-           {[
-             { name: "Landmark Rules", count: 42, color: "text-primary", bg: "bg-primary/10" },
-             { name: "Exam Essentials", count: 128, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-             { name: "Latin Terms", count: 56, color: "text-blue-500", bg: "bg-blue-500/10" }
-           ].map((deck, i) => (
+           {loading ? (
+             <div className="col-span-full flex flex-col items-center justify-center p-12 text-muted italic">
+               <Loader2 className="w-8 h-8 animate-spin mb-4" /> Loading your decks...
+             </div>
+           ) : decks.length > 0 ? decks.map((deck, i) => (
              <motion.div
                key={i}
                initial={{ opacity: 0, y: 20 }}
                animate={{ opacity: 1, y: 0 }}
                transition={{ delay: i * 0.1 }}
-               className="p-8 glass rounded-[32px] border-white/5 hover:border-primary/30 transition-all group cursor-pointer"
-               onClick={() => setSessionStarted(true)}
+               className="p-8 glass rounded-[32px] border-white/5 hover:border-emerald-500/30 transition-all group cursor-pointer"
+               onClick={() => startDeck(deck.name)}
              >
                 <div className={`w-12 h-12 rounded-xl ${deck.bg} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
                    <Layers className={`w-6 h-6 ${deck.color}`} />
                 </div>
-                <h3 className="text-xl font-bold mb-2">{deck.name}</h3>
+                <h3 className="text-xl font-bold mb-2 line-clamp-1">{deck.name}</h3>
                 <p className="text-xs text-muted font-black uppercase tracking-widest mb-6">{deck.count} Cards</p>
                 <div className="flex items-center justify-between">
                    <div className="flex -space-x-2">
                       <div className="w-6 h-6 rounded-full bg-slate-800 border-2 border-[#0B1120]"></div>
                       <div className="w-6 h-6 rounded-full bg-slate-700 border-2 border-[#0B1120]"></div>
                    </div>
-                   <span className="text-[10px] font-black text-primary uppercase flex items-center gap-1 group-hover:gap-2 transition-all">
+                   <span className="text-[10px] font-black text-emerald-500 uppercase flex items-center gap-1 group-hover:gap-2 transition-all">
                       Start Session <ArrowRight className="w-3 h-3" />
                    </span>
                 </div>
              </motion.div>
-           ))}
+           )) : (
+             <div className="col-span-full p-12 glass rounded-[32px] text-center">
+                <p className="text-muted italic mb-4">You haven't generated any flashcards yet.</p>
+                <p className="text-sm font-bold text-foreground">Go to any Case and click "Generate Deck"!</p>
+             </div>
+           )}
            
-           <div className="p-8 glass rounded-[32px] border-dashed border-2 border-white/10 flex flex-col items-center justify-center text-center opacity-50 hover:opacity-100 transition-all cursor-pointer">
+           <div className="p-8 glass rounded-[32px] border-dashed border-2 border-white/10 flex flex-col items-center justify-center text-center opacity-50 transition-all cursor-not-allowed">
               <Zap className="w-8 h-8 text-primary mb-4" />
-              <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">AI Generated Decks<br/><span className="text-[10px] text-primary">Pro Feature</span></p>
+              <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">Auto-Generate Decks<br/><span className="text-[10px] text-primary hidden">Pro Feature</span></p>
            </div>
         </section>
-      ) : (
+      ) : currentCard ? (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -178,13 +211,13 @@ export default function FlashcardsPage() {
            </AnimatePresence>
 
            <button 
-             onClick={() => setSessionStarted(false)}
+             onClick={() => { setSessionStarted(false); setActiveDeck(null); }}
              className="mt-16 text-xs font-black text-muted uppercase tracking-[0.2em] hover:text-foreground transition-all"
            >
               End Session
            </button>
         </motion.div>
-      )}
+      ) : null}
 
       {/* Global Perspectve styles */}
       <style>{`

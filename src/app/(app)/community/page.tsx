@@ -3,64 +3,226 @@
 import { motion } from "framer-motion";
 import { 
   Users2, 
-  MessageSquare, 
-  TrendingUp, 
   Plus, 
-  Share2, 
-  Heart, 
   MessageCircle,
-  MoreVertical,
-  Award,
-  Search,
-  Zap,
-  Tag
+  TrendingUp,
+  Tag,
+  Loader2,
+  X
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useUserContext } from "@/components/app/UserContext";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
+import { doc, updateDoc, increment as firestoreIncrement } from "firebase/firestore";
+import { addForumReply, likeForumPost, addPoints } from "@/lib/firebase/db";
+import { ArrowLeft, Heart, Send } from "lucide-react";
 
-const posts = [
-  {
-    id: 1,
-    author: "Bolaji Williams",
-    school: "University of Lagos",
-    title: "How to handle Company Law exams? The syllabus is huge!",
-    content: "Seriously struggling with the corporate personality section. Anyone has a summarized note or mindmap for Salomon v Salomon?",
-    tags: ["Study Tips", "Company Law", "UNILAG"],
-    likes: 42,
-    replies: 12,
-    time: "2h ago",
-    badge: "Student Ambassador"
-  },
-  {
-    id: 2,
-    author: "Zainab Mohammed",
-    school: "Ahmadu Bello University",
-    title: "Difference between Ratio Decidendi and Obiter Dictum",
-    content: "Could someone explain this in the simplest terms possible? My Jurisprudence lecturer is making it sound so complex.",
-    tags: ["Jurisprudence", "Legal Method"],
-    likes: 28,
-    replies: 15,
-    time: "5h ago",
-    badge: "Verified Tutor"
-  },
-  {
-    id: 3,
-    author: "Chidi Okafor",
-    school: "University of Nigeria, Nsukka",
-    title: "Legal Internship opportunities in Lagos for 400L students?",
-    content: "Looking for reputable law firms that offer student internships during the break. Any leads?",
-    tags: ["Career", "Internships", "Lagos"],
-    likes: 56,
-    replies: 8,
-    time: "8h ago"
-  }
-];
+interface ForumPost {
+  id: string;
+  author: string;
+  authorId: string;
+  university: string;
+  title: string;
+  content: string;
+  topicTag: string;
+  likes: number;
+  replies: number;
+  createdAt: any;
+}
 
 export default function CommunityPage() {
+  const { uid, userName, university } = useUserContext();
+  const [posts, setPosts] = useState<ForumPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Modal State
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [newTag, setNewTag] = useState("General Discussion");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Thread View State
+  const [selectedPost, setSelectedPost] = useState<ForumPost | null>(null);
+  const [replies, setReplies] = useState<any[]>([]);
+  const [newReply, setNewReply] = useState("");
+  const [isReplying, setIsReplying] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, "forums"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const fetchedPosts: ForumPost[] = [];
+      snapshot.forEach(doc => {
+        fetchedPosts.push({ id: doc.id, ...doc.data() } as ForumPost);
+      });
+      setPosts(fetchedPosts);
+      setIsLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPost) {
+      setReplies([]);
+      return;
+    }
+    const q = query(collection(db, "forums", selectedPost.id, "replies"), orderBy("createdAt", "asc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const fetchedReplies: any[] = [];
+      snapshot.forEach(doc => {
+        fetchedReplies.push({ id: doc.id, ...doc.data() });
+      });
+      setReplies(fetchedReplies);
+    });
+    return () => unsub();
+  }, [selectedPost]);
+
+  const handleCreatePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uid || !newTitle.trim() || !newContent.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "forums"), {
+        author: userName || "Anonymous Law Student",
+        authorId: uid,
+        university: university || "Nigerian University",
+        title: newTitle,
+        content: newContent,
+        topicTag: newTag,
+        likes: 0,
+        replies: 0,
+        createdAt: serverTimestamp()
+      });
+
+      // Reward points!
+      await addPoints(uid, 5);
+
+      // Reset
+      setIsCreating(false);
+      setNewTitle("");
+      setNewContent("");
+      setNewTag("General Discussion");
+    } catch (error) {
+      console.error("Error creating post:", error);
+      alert("Failed to create discussion. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleLike = async (e: React.MouseEvent, postId: string) => {
+    e.stopPropagation();
+    await likeForumPost(postId);
+    if (selectedPost && selectedPost.id === postId) {
+      setSelectedPost({ ...selectedPost, likes: selectedPost.likes + 1 });
+    }
+  };
+
+  const handleReplySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uid || !selectedPost || !newReply.trim()) return;
+
+    setIsReplying(true);
+    try {
+      await addForumReply(selectedPost.id, {
+        author: userName || "Anonymous Student",
+        authorId: uid,
+        university: university || "Nigerian University",
+        content: newReply,
+      });
+      setNewReply("");
+      await addPoints(uid, 2); // 2 XP per reply
+    } catch (error) {
+      console.error("Error replying:", error);
+    } finally {
+      setIsReplying(false);
+    }
+  };
+
   return (
-    <div className="grid lg:grid-cols-4 gap-8">
+    <div className="grid lg:grid-cols-4 gap-8 relative pb-20">
+      
+      {/* CREATE POST MODAL */}
+      {isCreating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="w-full max-w-2xl glass p-8 md:p-12 rounded-[48px] border-white/10 shadow-2xl space-y-8 relative"
+           >
+              <button 
+                onClick={() => setIsCreating(false)}
+                className="absolute top-8 right-8 p-3 glass rounded-full hover:bg-white/10 transition-colors"
+              >
+                 <X className="w-5 h-5 text-muted" />
+              </button>
+
+              <div>
+                 <h2 className="text-3xl font-bold flex items-center gap-3 italic">
+                    <MessageCircle className="w-6 h-6 text-primary" /> Start Discussion
+                 </h2>
+                 <p className="text-muted mt-2">Share thoughts, ask highly-academic questions, or request case notes.</p>
+              </div>
+
+              <form onSubmit={handleCreatePost} className="space-y-6">
+                 <div>
+                    <input 
+                      type="text" 
+                      placeholder="Title of your discussion..." 
+                      value={newTitle}
+                      onChange={e => setNewTitle(e.target.value)}
+                      required
+                      disabled={isSubmitting}
+                      className="w-full bg-slate-900/50 border border-white/10 rounded-2xl p-4 font-bold text-lg focus:outline-none focus:border-primary/50 transition-colors placeholder:text-muted/50"
+                    />
+                 </div>
+                 
+                 <div>
+                    <select 
+                      value={newTag}
+                      onChange={e => setNewTag(e.target.value)}
+                      disabled={isSubmitting}
+                      className="w-full bg-slate-900/50 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:border-primary/50 transition-colors"
+                    >
+                       <option value="General Discussion">General Discussion</option>
+                       <option value="Legal Concepts">Legal Concepts</option>
+                       <option value="Exam Preparation">Exam Preparation</option>
+                       <option value="Career Advice">Career Advice</option>
+                    </select>
+                 </div>
+
+                 <div>
+                    <textarea 
+                      placeholder="Explain your question or thoughts in detail..." 
+                      value={newContent}
+                      onChange={e => setNewContent(e.target.value)}
+                      required
+                      disabled={isSubmitting}
+                      rows={5}
+                      className="w-full bg-slate-900/50 border border-white/10 rounded-3xl p-6 text-sm leading-relaxed focus:outline-none focus:border-primary/50 transition-colors placeholder:text-muted/50 resize-none"
+                    ></textarea>
+                 </div>
+
+                 <button 
+                    type="submit" 
+                    disabled={isSubmitting || !newTitle.trim() || !newContent.trim()}
+                    className="w-full py-5 bg-primary text-background font-black rounded-2xl shadow-xl shadow-primary/20 hover:opacity-90 transition-opacity flex justify-center items-center gap-2 disabled:opacity-50"
+                 >
+                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : "Post Discussion (+5 XP)"}
+                 </button>
+              </form>
+           </motion.div>
+        </div>
+      )}
+
       {/* Sidebar: Navigation & Spaces */}
       <div className="hidden lg:flex flex-col gap-6">
-        <button className="w-full py-4 bg-primary text-background font-black rounded-2xl flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-xl shadow-primary/20">
+        <button 
+          onClick={() => setIsCreating(true)}
+          className="w-full py-4 bg-primary text-background font-black rounded-2xl flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-xl shadow-primary/20"
+        >
            <Plus className="w-5 h-5" /> Start Discussion
         </button>
 
@@ -70,31 +232,10 @@ export default function CommunityPage() {
                  <Users2 className="w-4 h-4" /> Spaces
               </h4>
               <div className="space-y-4">
-                 {["General Discussion", "Legal Concepts", "Exam Preparation", "Career Advice", "University Specific"].map((s, i) => (
+                 {["General Discussion", "Legal Concepts", "Exam Preparation", "Career Advice"].map((s, i) => (
                    <button key={i} className={`w-full text-left flex items-center gap-3 p-3 rounded-xl transition-all ${i === 0 ? 'bg-primary/10 text-primary font-bold' : 'text-muted hover:bg-white/5 hover:text-foreground text-sm font-medium'}`}>
                       <Tag className="w-3.5 h-3.5" /> {s}
                    </button>
-                 ))}
-              </div>
-           </div>
-
-           <div>
-              <h4 className="flex items-center gap-2 text-[10px] font-black text-muted uppercase tracking-widest mb-6 italic">
-                 <Award className="w-4 h-4" /> Top Contributors
-              </h4>
-              <div className="space-y-4">
-                 {[
-                   { name: "Bolaji Williams", pts: "14.2k" },
-                   { name: "Zainab Mohammed", pts: "12.8k" },
-                   { name: "Chidi Okafor", pts: "9.5k" }
-                 ].map((u, i) => (
-                   <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                         <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-black">{u.name[0]}</div>
-                         <p className="text-xs font-bold text-foreground">{u.name}</p>
-                      </div>
-                      <span className="text-[10px] font-black text-primary">{u.pts}</span>
-                   </div>
                  ))}
               </div>
            </div>
@@ -103,96 +244,149 @@ export default function CommunityPage() {
 
       {/* Main Feed */}
       <div className="lg:col-span-3 space-y-6">
-         {/* Search Bar */}
-         <div className="relative">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-muted" />
-            <input 
-              type="text" 
-              placeholder="Search discussions, topics, or people..."
-              className="w-full bg-white/5 border border-white/10 rounded-[28px] py-5 px-16 text-sm italic focus:outline-none focus:border-primary/50 transition-all font-medium"
-            />
-         </div>
+         
+         {!selectedPost ? (
+           <>
+              {/* Mobile Create Button */}
+              <div className="lg:hidden">
+                <button 
+                  onClick={() => setIsCreating(true)}
+                  className="w-full py-4 bg-primary text-background font-black rounded-2xl flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-5 h-5" /> Start Discussion
+                </button>
+              </div>
 
-         {/* Feed Tabs */}
-         <div className="flex gap-4 border-b border-white/5 px-2">
-            {["Trending", "Latest", "Following"].map((t, i) => (
-              <button key={i} className={`pb-4 px-2 text-xs font-black uppercase tracking-widest transition-all relative ${i === 0 ? 'text-primary' : 'text-muted hover:text-foreground'}`}>
-                 {t}
-                 {i === 0 && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-full"></div>}
-              </button>
-            ))}
-         </div>
+              <div className="flex gap-4 border-b border-white/5 px-2">
+                <button className="pb-4 px-2 text-xs font-black uppercase tracking-widest transition-all relative text-primary">
+                    Latest Discussions
+                    <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-full"></div>
+                </button>
+              </div>
 
-         {/* Posts */}
-         <div className="space-y-6">
-            {posts.map((post, i) => (
-              <motion.div
-                key={post.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="glass p-8 rounded-[40px] border-white/5 hover:border-white/10 transition-all group"
+              {/* Posts Feed */}
+              <div className="space-y-6">
+                {isLoading ? (
+                    <div className="flex justify-center items-center py-20">
+                      <Loader2 className="w-8 h-8 text-primary animate-spin opacity-50" />
+                    </div>
+                ) : posts.length === 0 ? (
+                    <div className="glass p-12 text-center rounded-[48px] border-white/5 border-dashed">
+                      <MessageCircle className="w-12 h-12 text-primary opacity-50 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold mb-2">No Discussions Yet</h3>
+                      <p className="text-sm text-muted">Be the first to ask a legal question or share a study tip!</p>
+                    </div>
+                ) : (
+                    posts.map((post, i) => (
+                      <motion.div
+                        key={post.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        onClick={() => setSelectedPost(post)}
+                        className="glass p-8 md:p-10 rounded-[40px] border-white/5 hover:border-white/10 transition-all group cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between mb-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center font-black text-primary text-lg shrink-0">
+                                  {post.author[0]}
+                              </div>
+                              <div>
+                                  <h4 className="font-bold text-sm mb-0.5">{post.author}</h4>
+                                  <p className="text-[9px] text-muted font-bold uppercase tracking-widest">{post.university}</p>
+                              </div>
+                            </div>
+                            <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-[9px] font-black text-muted uppercase tracking-widest">
+                              {post.topicTag}
+                            </span>
+                        </div>
+
+                        <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors leading-snug">{post.title}</h3>
+                        <p className="text-sm text-muted leading-relaxed mb-6 italic opacity-80 line-clamp-3">{post.content}</p>
+
+                        <div className="flex items-center gap-6 pt-4 border-t border-white/5">
+                            <button onClick={(e) => handleLike(e, post.id)} className="flex items-center gap-2 text-xs font-bold text-muted hover:text-rose-500 transition-colors">
+                              <Heart className={`w-4 h-4 ${post.likes > 0 ? 'fill-rose-500 text-rose-500' : ''}`} /> {post.likes}
+                            </button>
+                            <div className="flex items-center gap-2 text-xs font-bold text-muted">
+                              <MessageCircle className="w-4 h-4" /> {post.replies}
+                            </div>
+                        </div>
+                      </motion.div>
+                    ))
+                )}
+              </div>
+           </>
+         ) : (
+           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+              <button 
+                onClick={() => setSelectedPost(null)}
+                className="flex items-center gap-2 text-xs font-bold text-muted hover:text-primary transition-colors"
               >
-                 <div className="flex items-start justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                       <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center font-black text-primary relative">
-                          {post.author[0]}
-                          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#0B1120] rounded-lg flex items-center justify-center">
-                             <TrendingUp className="w-3 h-3 text-emerald-500" />
-                          </div>
-                       </div>
-                       <div>
-                          <div className="flex items-center gap-2 mb-0.5">
-                             <h4 className="font-bold text-sm">{post.author}</h4>
-                             {post.badge && (
-                               <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-[8px] font-black uppercase tracking-tighter">{post.badge}</span>
-                             )}
-                          </div>
-                          <p className="text-[10px] text-muted font-bold uppercase tracking-widest italic">{post.school} • {post.time}</p>
-                       </div>
+                 <ArrowLeft className="w-4 h-4" /> Back to Feed
+              </button>
+
+              <div className="glass p-10 rounded-[48px] border-primary/20">
+                 <div className="flex items-center gap-4 mb-8">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center font-black text-primary text-2xl">
+                      {selectedPost.author[0]}
                     </div>
-                    <button className="text-muted hover:text-foreground transition-all"><MoreVertical className="w-4 h-4" /></button>
-                 </div>
-
-                 <h3 className="text-xl font-bold mb-4 group-hover:text-primary transition-colors italic leading-snug">{post.title}</h3>
-                 <p className="text-sm text-muted leading-relaxed mb-6 italic opacity-80">"{post.content}"</p>
-
-                 <div className="flex flex-wrap gap-2 mb-8">
-                    {post.tags.map((tag, j) => (
-                      <span key={j} className="px-3 py-1 bg-white/5 border border-white/5 rounded-lg text-[9px] font-black text-muted uppercase tracking-widest">#{tag}</span>
-                    ))}
-                 </div>
-
-                 <div className="flex items-center justify-between pt-6 border-t border-white/5">
-                    <div className="flex items-center gap-6">
-                       <button className="flex items-center gap-2 text-muted hover:text-rose-500 transition-all font-black text-[10px] uppercase">
-                          <Heart className="w-4 h-4" /> {post.likes}
-                       </button>
-                       <button className="flex items-center gap-2 text-muted hover:text-primary transition-all font-black text-[10px] uppercase">
-                          <MessageCircle className="w-4 h-4" /> {post.replies}
-                       </button>
+                    <div>
+                        <h4 className="font-bold text-lg">{selectedPost.author}</h4>
+                        <p className="text-xs text-muted font-bold uppercase tracking-widest">{selectedPost.university}</p>
                     </div>
-                    <button className="p-2 text-muted hover:text-foreground transition-all"><Share2 className="w-4 h-4" /></button>
                  </div>
-              </motion.div>
-            ))}
-         </div>
+                 <h2 className="text-3xl font-bold mb-6 italic">{selectedPost.title}</h2>
+                 <p className="text-base text-muted leading-relaxed italic whitespace-pre-wrap mb-10">{selectedPost.content}</p>
+                 
+                 <div className="flex items-center gap-6 py-6 border-t border-white/5">
+                    <button onClick={(e) => handleLike(e, selectedPost.id)} className="flex items-center gap-2 text-sm font-bold text-muted hover:text-rose-500 transition-colors">
+                      <Heart className={`w-5 h-5 ${selectedPost.likes > 0 ? 'fill-rose-500 text-rose-500' : ''}`} /> {selectedPost.likes} Likes
+                    </button>
+                    <div className="flex items-center gap-2 text-sm font-bold text-muted">
+                      <MessageCircle className="w-5 h-5" /> {selectedPost.replies} Replies
+                    </div>
+                 </div>
+              </div>
 
-         {/* Pro Interaction Card */}
-         <div className="p-10 glass rounded-[48px] border-primary/20 bg-gradient-to-r from-primary/10 via-transparent to-transparent flex items-center justify-between">
-            <div className="flex items-center gap-6">
-               <div className="w-16 h-16 rounded-[24px] bg-primary/20 flex items-center justify-center">
-                  <Zap className="w-8 h-8 text-primary fill-current" />
-               </div>
-               <div>
-                  <h4 className="text-xl font-bold mb-1 italic">Join Expert Q&A Sessions</h4>
-                  <p className="text-xs text-muted italic">Exclusive weekly live sessions with senior lawyers and academy lecturers.</p>
-               </div>
-            </div>
-            <button className="px-8 py-4 bg-primary text-background font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all text-xs uppercase tracking-widest">
-               Upgrade for Access
-            </button>
-         </div>
+              {/* Replies */}
+              <div className="space-y-6 pl-10 border-l border-white/5">
+                 <h4 className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-4">Thread Replies</h4>
+                 {replies.map((reply, i) => (
+                   <motion.div key={reply.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass p-6 rounded-3xl border-white/5">
+                      <div className="flex items-center gap-3 mb-3">
+                         <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-black text-primary">
+                            {reply.author[0]}
+                         </div>
+                         <div>
+                            <p className="text-xs font-bold">{reply.author}</p>
+                            <p className="text-[8px] text-muted uppercase font-bold">{reply.university}</p>
+                         </div>
+                      </div>
+                      <p className="text-sm text-muted leading-relaxed italic opacity-90">{reply.content}</p>
+                   </motion.div>
+                 ))}
+
+                 {/* Reply Input */}
+                 <form onSubmit={handleReplySubmit} className="relative mt-10">
+                    <textarea 
+                      placeholder="Add your legal perspective..."
+                      value={newReply}
+                      onChange={e => setNewReply(e.target.value)}
+                      rows={3}
+                      className="w-full bg-slate-900/50 border border-white/10 rounded-3xl p-6 pr-20 text-sm focus:outline-none focus:border-primary/50 transition-all resize-none italic"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={isReplying || !newReply.trim()}
+                      className="absolute right-4 bottom-4 w-12 h-12 bg-primary text-background rounded-2xl flex items-center justify-center hover:opacity-90 disabled:opacity-50 shadow-lg shadow-primary/20"
+                    >
+                       {isReplying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </button>
+                 </form>
+              </div>
+           </motion.div>
+         )}
       </div>
     </div>
   );

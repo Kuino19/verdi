@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useParams } from "next/navigation";
+import { fetchCaseById, addPoints } from "@/lib/firebase/db";
+import { useUserContext } from "@/components/app/UserContext";
+import { db } from "@/lib/firebase/client";
+import { collection, addDoc } from "firebase/firestore";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, 
   Bookmark, 
@@ -13,32 +18,203 @@ import {
   AlertCircle,
   BrainCircuit,
   MessageCircle,
-  Plus
+  Plus,
+  X,
+  Zap,
+  Play,
+  Pause,
+  Square
 } from "lucide-react";
 import Link from "next/link";
-export default function CaseDetailPage({ params }: { params: { id: string } }) {
+export default function CaseDetailPage() {
+  const params = useParams();
+  const caseId = params?.id as string;
+
   const [activeTab, setActiveTab] = useState("facts");
   const [isSaved, setIsSaved] = useState(true);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isAIThinking, setIsAIThinking] = useState(false);
+  const [isGeneratingCards, setIsGeneratingCards] = useState(false);
+  
+  // TTS State
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
-  const handleAIExplain = async () => {
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [caseData, setCaseData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
+  const { uid } = useUserContext();
+
+  // Highlighting State
+  const [highlightedText, setHighlightedText] = useState("");
+  const [highlightRect, setHighlightRect] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      if (!caseId) return;
+      const data = await fetchCaseById(caseId);
+      setCaseData(data);
+      setLoading(false);
+    }
+    load();
+  }, [caseId]);
+
+  const fetchAIExplanation = async (promptMsg: string) => {
     setIsAIThinking(true);
+    setAiResponse(null); // Clear previous cache when asking a new question
     try {
       const response = await fetch("/api/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [{ role: "user", content: `Explain the key legal principle in Donoghue v Stevenson to a law student using a simple analogy.` }],
-          type: "summarize"
+          messages: [{ role: "user", content: promptMsg }],
+          type: "assistant"
         })
       });
       const data = await response.json();
-      setAiResponse(data.content);
-    } catch (error) {
-      setAiResponse("I'm sorry, I couldn't generate an explanation right now.");
+      if (!response.ok) {
+        setAiResponse(`Error: ${data.error || data.details || "API Error"}`);
+      } else {
+        setAiResponse(data.content || "Empty response from AI.");
+        // Award XP for learning
+        if (uid) addPoints(uid, 5);
+      }
+    } catch (error: any) {
+      setAiResponse(`Error: ${error.message || "Something went wrong"}`);
     } finally {
       setIsAIThinking(false);
+    }
+  };
+
+  const handleAIExplain = async () => {
+    if (!caseData) return;
+    setAiModalOpen(true);
+    if (aiResponse && !aiResponse.startsWith("Error:") && !aiResponse.includes("highlighted legal text")) return;
+    
+    await fetchAIExplanation(`Explain the key legal principle in ${caseData.title} to a law student using a simple, relatable real-life analogy. Keep your response extremely brief, maximum 3 sentences.`);
+  };
+
+  const explainHighlight = async (text: string) => {
+    setAiModalOpen(true);
+    await fetchAIExplanation(`I highlighted the following legal text from the case ${caseData.title}: "${text}". Explain what this specifically means in plain, simple English to a law student. Keep it extremely concise.`);
+  };
+
+  const handleGenerateFlashcards = async () => {
+    if (!caseData || !uid) {
+       alert("Please ensure you are logged in.");
+       return;
+    }
+    setIsGeneratingCards(true);
+    try {
+      const text = `Facts: ${caseData.facts}\n\nIssues: ${caseData.issues}\n\nReasoning: ${caseData.reasoning}\n\nDecision: ${caseData.decision}`;
+      
+      const res = await fetch("/api/flashcards/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: caseData.title, text })
+      });
+      const data = await res.json();
+      
+      if (data.flashcards && Array.isArray(data.flashcards)) {
+        const deckName = caseData.title;
+        const promises = data.flashcards.map((card: any) => 
+          addDoc(collection(db, "users", uid, "flashcards"), {
+            deck: deckName,
+            subject: "Case Law",
+            question: card.question,
+            answer: card.answer,
+            createdAt: new Date()
+          })
+        );
+        await Promise.all(promises);
+        addPoints(uid, 20); // Award XP for generating a deck!
+        alert("Successfully generated and saved 5 flashcards to your library! (+20 XP)");
+      } else {
+        alert("Failed to generate flashcards.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error generating flashcards.");
+    } finally {
+      setIsGeneratingCards(false);
+    }
+  };
+
+  const handleSelection = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      setHighlightRect(null);
+      return;
+    }
+    const text = selection.toString().trim();
+    if (text.length > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      setHighlightedText(text);
+      setHighlightRect({
+        top: rect.top,
+        left: rect.left + rect.width / 2,
+      });
+    } else {
+      setHighlightRect(null);
+    }
+  };
+
+  const clearSelection = () => {
+    if (highlightRect) {
+      setHighlightRect(null);
+    }
+  };
+
+  const listenToCase = () => {
+    if (!window.speechSynthesis) {
+       alert("Your browser does not support text-to-speech.");
+       return;
+    }
+    
+    if (isPaused) {
+       window.speechSynthesis.resume();
+       setIsPaused(false);
+       setIsPlaying(true);
+       return;
+    }
+    
+    if (isPlaying) {
+       window.speechSynthesis.pause();
+       setIsPaused(true);
+       setIsPlaying(false);
+       return;
+    }
+
+    // Clean text by stripping markdown or weird chars if needed
+    const cleanText = (text: string) => text.replace(/[*#]/g, '');
+
+    const textToRead = `Case Title: ${cleanText(caseData.title)}. Citation: ${cleanText(caseData.citation)}. Facts of the case: ${cleanText(caseData.facts)}. Legal issues: ${cleanText(caseData.issues)}. Court's reasoning: ${cleanText(caseData.reasoning)}. The decision: ${cleanText(caseData.decision)}.`;
+    
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+    
+    const voices = window.speechSynthesis.getVoices();
+    const premiumVoice = voices.find(v => v.name.includes("Google UK English Female") || v.name.includes("Samantha")) || voices[0];
+    if (premiumVoice) utterance.voice = premiumVoice;
+
+    utterance.onend = () => {
+       setIsPlaying(false);
+       setIsPaused(false);
+    };
+
+    window.speechSynthesis.speak(utterance);
+    setIsPlaying(true);
+    setIsPaused(false);
+  };
+  
+  const stopListening = () => {
+    if (window.speechSynthesis) {
+       window.speechSynthesis.cancel();
+       setIsPlaying(false);
+       setIsPaused(false);
     }
   };
 
@@ -48,6 +224,14 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
     { id: "reasoning", label: "Court's Reasoning", icon: Gavel },
     { id: "decision", label: "Final Decision", icon: Scale }
   ];
+
+  if (loading) {
+    return <div className="max-w-5xl mx-auto py-32 text-center text-muted italic flex flex-col items-center justify-center gap-4"><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div> Loading Case Data...</div>;
+  }
+
+  if (!caseData) {
+    return <div className="max-w-5xl mx-auto py-32 text-center text-rose-500 font-bold italic">Case not found. Please return to the library.</div>;
+  }
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -75,12 +259,34 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
       {/* Case Header */}
       <section className="mb-12">
         <div className="flex flex-wrap items-center gap-3 mb-6">
-           <span className="px-4 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-black uppercase tracking-widest italic">LANDMARK CASE</span>
-           <span className="px-4 py-1.5 glass text-muted border-white/10 rounded-full text-xs font-black uppercase tracking-widest">TORT LAW</span>
-           <span className="px-4 py-1.5 glass text-muted border-white/10 rounded-full text-xs font-black uppercase tracking-widest">NEGLIGENCE</span>
+           {caseData.landmark && <span className="px-4 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-xs font-black uppercase tracking-widest italic">LANDMARK CASE</span>}
+           {caseData.subject && <span className="px-4 py-1.5 glass text-muted border-white/10 rounded-full text-xs font-black uppercase tracking-widest">{caseData.subject}</span>}
+           {caseData.topic && <span className="px-4 py-1.5 glass text-muted border-white/10 rounded-full text-xs font-black uppercase tracking-widest">{caseData.topic}</span>}
         </div>
-        <h1 className="text-4xl md:text-6xl font-bold mb-6 italic leading-tight">Donoghue v Stevenson</h1>
-        <p className="text-xl font-mono text-muted">[1932] AC 562, (1932) UKHL 100</p>
+        <h1 className="text-4xl md:text-6xl font-bold mb-6 italic leading-tight">{caseData.title || "Untitled Case"}</h1>
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+           <p className="text-xl font-mono text-muted">{caseData.citation || "No citation provided"}</p>
+           
+           {/* Audio Player Controls */}
+           <div className="flex items-center gap-2 p-2 glass rounded-2xl border-emerald-500/20 max-w-sm w-full md:w-auto">
+              <button 
+                onClick={listenToCase}
+                className="flex items-center gap-2 px-6 py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors flex-1 justify-center whitespace-nowrap"
+              >
+                 {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
+                 {isPlaying ? "Pause" : isPaused ? "Resume Audio" : "Listen to Case"}
+              </button>
+              {(isPlaying || isPaused) && (
+                <button 
+                  onClick={stopListening}
+                  className="p-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-colors"
+                >
+                   <Square className="w-4 h-4 fill-current" />
+                </button>
+              )}
+           </div>
+        </div>
       </section>
 
       <div className="grid lg:grid-cols-4 gap-10">
@@ -107,31 +313,40 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
               </h4>
               <p className="text-[10px] text-muted italic mb-4 leading-relaxed">Need a simpler breakdown or a real-life analogy for this case?</p>
               
-              {aiResponse ? (
-                <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10 text-[10px] text-muted italic mb-4 leading-relaxed">
-                   {aiResponse}
-                </div>
-              ) : null}
-
               <button 
                 onClick={handleAIExplain}
-                disabled={isAIThinking}
-                className="w-full py-3 bg-emerald-500 text-background text-[10px] font-black rounded-xl uppercase tracking-widest disabled:opacity-50"
+                className="w-full py-3 mb-3 bg-emerald-500 text-background text-[10px] font-black rounded-xl uppercase tracking-widest hover:bg-emerald-400 transition-colors flex items-center justify-center gap-2"
               >
-                 {isAIThinking ? 'Analyzing...' : 'Explain Principle'}
+                 <BrainCircuit className="w-3.5 h-3.5" /> Explain Principle
+              </button>
+
+              <button 
+                onClick={handleGenerateFlashcards}
+                disabled={isGeneratingCards}
+                className="w-full py-3 bg-primary/10 text-primary border border-primary/20 text-[10px] font-black rounded-xl uppercase tracking-widest hover:bg-primary/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                 {isGeneratingCards ? (
+                   <div className="flex gap-1.5 items-center">
+                     <span className="w-1 h-1 bg-primary rounded-full animate-bounce" />
+                     <span className="w-1 h-1 bg-primary rounded-full animate-bounce [animation-delay:0.15s]" />
+                     <span className="w-1 h-1 bg-primary rounded-full animate-bounce [animation-delay:0.3s]" />
+                   </div>
+                 ) : (
+                   <><Zap className="w-3.5 h-3.5" /> Generate Deck</>
+                 )}
               </button>
            </div>
         </div>
 
         {/* Content Area */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3" onMouseUp={handleSelection} onTouchEnd={handleSelection}>
            <motion.div
              key={activeTab}
              initial={{ opacity: 0, x: 20 }}
              animate={{ opacity: 1, x: 0 }}
              className="glass p-8 md:p-12 rounded-[48px] border-white/5 min-h-[500px]"
            >
-              {activeTab === "facts" && (
+               {activeTab === "facts" && (
                 <div className="space-y-6">
                    <h3 className="text-2xl font-bold flex items-center gap-3 italic">
                       <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
@@ -139,23 +354,8 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
                       </div>
                       The Facts
                    </h3>
-                   <div className="prose prose-invert max-w-none text-muted leading-relaxed space-y-4 text-lg">
-                      <p>
-                        The appellant, Mrs Donoghue, went to a café in Paisley with a friend who bought her a bottle of ginger beer. 
-                        The bottle was made of dark, opaque glass. Mrs Donoghue drank some of the ginger beer and then poured the remainder 
-                        into a tumbler.
-                      </p>
-                      <div className="p-6 bg-white/5 rounded-3xl border border-white/5 font-medium italic">
-                        "As she did so, the decomposed remains of a snail floated out of the bottle and into the tumbler."
-                      </div>
-                      <p>
-                        Mrs Donoghue subsequently suffered from shock and severe gastroenteritis. She sued the manufacturer, 
-                        Mr Stevenson, in the Court of Session, claiming that he had a duty of care to ensure that the ginger beer was 
-                        free from such contaminants.
-                      </p>
-                      <p>
-                        She had no contract with Mr Stevenson (the retailer did), so the case was brought in negligence.
-                      </p>
+                   <div className="prose prose-invert max-w-none text-muted leading-relaxed space-y-4 text-lg whitespace-pre-wrap">
+                      {caseData.facts || (caseData.processed ? "No facts recorded." : "Facts have not been processed yet. Please ask Verdi AI or an admin to process this case.")}
                    </div>
                 </div>
               )}
@@ -168,16 +368,8 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
                       </div>
                       Legal Issues
                    </h3>
-                   <div className="space-y-6">
-                      <div className="p-8 glass rounded-3xl border-l-8 border-orange-500">
-                         <h4 className="text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-3">Primary Issue</h4>
-                         <p className="text-xl font-bold leading-relaxed">
-                            Does a manufacturer of products owe a duty of care to the ultimate consumer, in the absence of a contractual relationship?
-                         </p>
-                      </div>
-                      <p className="text-muted text-lg italic pl-8">
-                         Prior to this case, the general rule was that there could be no liability without a contract between the parties.
-                      </p>
+                   <div className="space-y-6 whitespace-pre-wrap text-muted text-lg leading-relaxed">
+                      {caseData.issues || "No legal issues identified yet."}
                    </div>
                 </div>
               )}
@@ -190,19 +382,8 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
                       </div>
                       Court's Reasoning
                    </h3>
-                   <div className="prose prose-invert max-w-none text-muted leading-relaxed space-y-6 text-lg">
-                      <p>
-                        Lord Atkin formulated the famous <span className="text-foreground font-bold">"Neighbor Principle"</span>, 
-                        drawing inspiration from the biblical command to love thy neighbor.
-                      </p>
-                      <div className="p-10 glass rounded-[40px] border-white/10 text-foreground italic font-serif text-2xl leading-relaxed relative">
-                         <div className="absolute top-4 left-6 text-6xl text-primary/20">"</div>
-                         "You must take reasonable care to avoid acts or omissions which you can reasonably foresee would be likely to injure your neighbor."
-                      </div>
-                      <p>
-                        He defined a "neighbor" as someone who is so closely and directly affected by my act that I ought reasonably 
-                        to have them in contemplation when I am directing my mind to the acts or omissions in question.
-                      </p>
+                   <div className="prose prose-invert max-w-none text-muted leading-relaxed space-y-6 text-lg whitespace-pre-wrap">
+                      {caseData.reasoning || "Reasoning is still being processed."}
                    </div>
                 </div>
               )}
@@ -218,22 +399,7 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
                    <div className="space-y-8">
                       <div className="p-10 bg-emerald-500/10 rounded-[40px] border border-emerald-500/20">
                          <h4 className="text-xs font-bold text-emerald-500 uppercase tracking-widest mb-4">Final Verdict</h4>
-                         <p className="text-3xl font-black italic mb-6">Judgment for the Appellant (Mrs Donoghue).</p>
-                         <p className="text-muted text-lg leading-relaxed">
-                            The House of Lords ruled that manufacturers owe a duty of care to consumers. Stevenson was held liable 
-                            for the snail in the ginger beer.
-                         </p>
-                      </div>
-                      
-                      <div className="grid md:grid-cols-2 gap-6">
-                         <div className="p-6 glass rounded-3xl">
-                            <h5 className="text-[10px] font-black uppercase text-muted mb-2 tracking-widest italic">Ratio Decidendi</h5>
-                            <p className="text-sm font-bold">Manufacturers owe a duty of care to consumers who use their products, even without a contract.</p>
-                         </div>
-                         <div className="p-6 glass rounded-3xl">
-                            <h5 className="text-[10px] font-black uppercase text-muted mb-2 tracking-widest italic">Legacy</h5>
-                            <p className="text-sm font-bold">Birth of modern negligence law and the neighbor principle globally.</p>
-                         </div>
+                         <p className="text-xl italic mb-6 whitespace-pre-wrap leading-relaxed">{caseData.decision || "Pending verdict processing."}</p>
                       </div>
                    </div>
                 </div>
@@ -257,6 +423,98 @@ export default function CaseDetailPage({ params }: { params: { id: string } }) {
            </div>
         </div>
       </div>
+
+      {/* Floating Highlight Tooltip */}
+      <AnimatePresence>
+        {highlightRect && highlightedText && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed z-40 transform -translate-x-1/2 -translate-y-full pb-3 pointer-events-auto"
+            style={{ top: highlightRect.top, left: highlightRect.left }}
+          >
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/95 backdrop-blur-md border border-white/10 shadow-2xl rounded-xl">
+               <button 
+                 onClick={(e) => {
+                   e.preventDefault();
+                   e.stopPropagation();
+                   explainHighlight(highlightedText);
+                   window.getSelection()?.removeAllRanges();
+                   setHighlightRect(null);
+                 }}
+                 className="flex items-center gap-2 px-2 py-1 text-xs font-bold text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+               >
+                 <BrainCircuit className="w-3.5 h-3.5" /> Explain Selection
+               </button>
+               <div className="w-px h-4 bg-white/10" />
+               <button
+                 onClick={(e) => {
+                   e.preventDefault();
+                   window.getSelection()?.removeAllRanges();
+                   setHighlightRect(null);
+                   alert("Notes feature coming in Phase 2!"); 
+                 }}
+                 className="flex items-center gap-2 px-2 py-1 text-xs font-bold text-muted hover:text-foreground hover:bg-white/5 rounded-lg transition-colors"
+               >
+                 <Plus className="w-3.5 h-3.5" /> Add to Notes
+               </button>
+            </div>
+            <div className="absolute left-1/2 bottom-1 -translate-x-1/2 w-3 h-3 bg-slate-900/95 border-r border-b border-white/10 rotate-45 transform" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* AI Explanation Modal */}
+      <AnimatePresence>
+        {aiModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+            onClick={() => setAiModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg glass border-white/10 rounded-[32px] overflow-hidden shadow-2xl shadow-emerald-500/10"
+            >
+              <div className="p-6 md:p-8 bg-gradient-to-br from-emerald-500/10 to-transparent">
+                <div className="flex items-start justify-between mb-6">
+                  <h3 className="text-xl font-bold italic flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                      <BrainCircuit className="w-5 h-5 text-emerald-500" />
+                    </div>
+                    Verdi AI Explanation
+                  </h3>
+                  <button 
+                    onClick={() => setAiModalOpen(false)}
+                    className="w-8 h-8 rounded-full glass flex items-center justify-center hover:bg-white/10 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-muted hover:text-white" />
+                  </button>
+                </div>
+                
+                <div className="min-h-[140px] flex items-center justify-center p-6 bg-black/40 rounded-2xl border border-white/5">
+                  {isAIThinking ? (
+                    <div className="flex flex-col items-center gap-4 text-muted italic">
+                      <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                      Crafting a legal analogy...
+                    </div>
+                  ) : (
+                    <p className="text-sm md:text-base leading-relaxed whitespace-pre-wrap text-foreground italic">
+                      {aiResponse || "Something went wrong."}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

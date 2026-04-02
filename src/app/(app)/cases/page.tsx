@@ -13,7 +13,8 @@ import {
   Star
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { fetchAllCases } from "@/lib/firebase/db";
 
 const mockCases = [
   {
@@ -89,10 +90,28 @@ const subjects = ["All Subjects", "Tort", "Contract", "Criminal", "Company", "Co
 export default function CasesPage() {
   const [selectedSubject, setSelectedSubject] = useState("All Subjects");
   const [searchQuery, setSearchQuery] = useState("");
+  const [cases, setCases] = useState<any[]>(mockCases);
+  const [loading, setLoading] = useState(true);
 
-  const filteredCases = mockCases.filter(c => 
-    (selectedSubject === "All Subjects" || c.subject.includes(selectedSubject)) &&
-    (c.title.toLowerCase().includes(searchQuery.toLowerCase()) || c.summary.toLowerCase().includes(searchQuery.toLowerCase()))
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await fetchAllCases();
+        if (data.length > 0) {
+          setCases(data);
+        }
+      } catch (e) {
+        console.error("Error loading cases:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const filteredCases = cases.filter(c => 
+    (selectedSubject === "All Subjects" || (c.subject && c.subject.includes(selectedSubject))) &&
+    (c.title.toLowerCase().includes(searchQuery.toLowerCase()) || (c.summary && c.summary.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   return (

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import OCRUploadModal from "@/components/app/OCRUploadModal";
 
 const savedItems = [
   { id: 1, type: "Case", title: "Donoghue v Stevenson", category: "Tort Law", info: "[1932] AC 562" },
@@ -25,6 +26,7 @@ const savedItems = [
 
 export default function BookmarksPage() {
   const [filter, setFilter] = useState("All");
+  const [isOCRModalOpen, setIsOCRModalOpen] = useState(false);
 
   return (
     <div className="space-y-10">
@@ -43,6 +45,12 @@ export default function BookmarksPage() {
                {f}s
              </button>
            ))}
+           <button 
+             onClick={() => setIsOCRModalOpen(true)}
+             className="px-5 py-2.5 rounded-xl text-[10px] bg-primary/20 text-primary font-black uppercase tracking-widest border border-primary/20 transition-all hover:bg-primary/30 flex items-center gap-2"
+           >
+              <Sparkles className="w-3.5 h-3.5" /> OCR Note
+           </button>
         </div>
       </header>
 
@@ -117,6 +125,12 @@ export default function BookmarksPage() {
             Go Pro
          </Link>
       </div>
+
+      <OCRUploadModal 
+        isOpen={isOCRModalOpen} 
+        onClose={() => setIsOCRModalOpen(false)} 
+        type="note" 
+      />
     </div>
   );
 }

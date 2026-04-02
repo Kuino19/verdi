@@ -63,7 +63,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex bg-[#0B1120] overflow-hidden">
+    <main className="min-h-screen flex bg-[#0B1120] overflow-hidden" suppressHydrationWarning>
       
       {/* ── Left Panel (decorative) — hidden on mobile ── */}
       <div className="hidden lg:flex flex-col justify-between w-[45%] xl:w-[42%] bg-gradient-to-br from-primary/20 via-slate-900 to-[#0B1120] border-r border-white/5 p-12 relative overflow-hidden">

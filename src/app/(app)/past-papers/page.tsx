@@ -10,9 +10,13 @@ import {
   Filter, 
   Star,
   Clock,
-  BookOpen
+  Lock
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useUserContext } from "@/components/app/UserContext";
+import { useRouter } from "next/navigation";
+import OCRUploadModal from "@/components/app/OCRUploadModal";
+import { fetchAllCases } from "@/lib/firebase/db";
 
 const mockPapers = [
   { id: 1, title: "Law of Tort I", year: "2023", school: "University of Lagos", session: "First Semester", level: "300L" },
@@ -25,10 +29,29 @@ const mockPapers = [
 
 export default function PastPapersPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const { isPremium } = useUserContext();
+  const router = useRouter();
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [cases, setCases] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredPapers = mockPapers.filter(p => 
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await fetchAllCases();
+        setCases(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const filteredPapers = [...mockPapers, ...cases.filter(c => c.type === 'past-paper')].filter(p => 
     p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    p.school.toLowerCase().includes(searchQuery.toLowerCase())
+    (p.school && p.school.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -66,38 +89,51 @@ export default function PastPapersPage() {
 
       {/* Results Grid */}
       <section className="grid md:grid-cols-2 gap-6">
-         {filteredPapers.map((paper, i) => (
-           <motion.div
-             key={paper.id}
-             initial={{ opacity: 0, x: -20 }}
-             animate={{ opacity: 1, x: 0 }}
-             transition={{ delay: i * 0.05 }}
-             className="glass p-8 rounded-[36px] border-white/5 flex items-center justify-between group hover:border-primary/20 transition-all"
-           >
-              <div className="flex items-center gap-6">
-                 <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                    <FileText className="w-8 h-8 text-primary/50 group-hover:text-primary transition-colors" />
-                 </div>
-                 <div>
-                    <div className="flex items-center gap-3 mb-2">
-                       <span className="text-[10px] font-black text-primary uppercase tracking-widest">{paper.level}</span>
-                       <span className="text-[10px] font-bold text-muted uppercase tracking-widest">•</span>
-                       <span className="text-[10px] font-bold text-muted uppercase tracking-widest">{paper.year}</span>
-                    </div>
-                    <h3 className="text-xl font-bold mb-1 italic">{paper.title}</h3>
-                    <p className="text-xs text-muted font-bold opacity-60">{paper.school}</p>
-                 </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                 <button className="p-3 glass rounded-xl text-muted hover:text-primary transition-all">
-                    <Download className="w-4 h-4" />
-                 </button>
-                 <button className="p-3 glass rounded-xl text-muted hover:text-foreground transition-all">
-                    <ChevronRight className="w-4 h-4" />
-                 </button>
-              </div>
-           </motion.div>
-         ))}
+         {filteredPapers.map((paper, i) => {
+           const isLocked = !isPremium && i >= 2;
+           return (
+             <motion.div
+               key={paper.id}
+               initial={{ opacity: 0, x: -20 }}
+               animate={{ opacity: 1, x: 0 }}
+               transition={{ delay: i * 0.05 }}
+               className="glass p-8 rounded-[36px] border-white/5 flex items-center justify-between group hover:border-primary/20 transition-all relative overflow-hidden"
+             >
+                <div className={`flex items-center gap-6 ${isLocked ? "opacity-30 blur-[2px]" : ""}`}>
+                   <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                      <FileText className="w-8 h-8 text-primary/50 group-hover:text-primary transition-colors" />
+                   </div>
+                   <div>
+                      <div className="flex items-center gap-3 mb-2">
+                         <span className="text-[10px] font-black text-primary uppercase tracking-widest">{paper.level}</span>
+                         <span className="text-[10px] font-bold text-muted uppercase tracking-widest">•</span>
+                         <span className="text-[10px] font-bold text-muted uppercase tracking-widest">{paper.year}</span>
+                      </div>
+                      <h3 className="text-xl font-bold mb-1 italic">{paper.title}</h3>
+                      <p className="text-xs text-muted font-bold opacity-60">{paper.school}</p>
+                   </div>
+                </div>
+                
+                {isLocked ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm z-10 rounded-[36px]">
+                    <Lock className="w-8 h-8 text-primary mb-2" />
+                    <button onClick={() => router.push("/subscription")} className="px-4 py-2 bg-primary text-background font-bold text-xs rounded-xl shadow-[0_0_20px_rgba(201,162,39,0.3)]">
+                      Upgrade to Unlock
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 relative z-20">
+                     <button className="p-3 glass rounded-xl text-muted hover:text-primary transition-all">
+                        <Download className="w-4 h-4" />
+                     </button>
+                     <button className="p-3 glass rounded-xl text-muted hover:text-foreground transition-all">
+                        <ChevronRight className="w-4 h-4" />
+                     </button>
+                  </div>
+                )}
+             </motion.div>
+           );
+         })}
       </section>
 
       {/* Quick Access Sidebar Component (Planned Integration) */}
@@ -116,10 +152,19 @@ export default function PastPapersPage() {
                </div>
             </div>
          </div>
-         <button className="px-10 py-5 bg-primary text-background font-black rounded-2xl shadow-xl shadow-primary/20 flex items-center gap-3 hover:scale-105 transition-all">
+         <button 
+           onClick={() => setIsUploadModalOpen(true)}
+           className="px-10 py-5 bg-primary text-background font-black rounded-2xl shadow-xl shadow-primary/20 flex items-center gap-3 hover:scale-105 transition-all"
+         >
             <Library className="w-5 h-5" /> Upload Now
          </button>
       </div>
+
+      <OCRUploadModal 
+        isOpen={isUploadModalOpen} 
+        onClose={() => setIsUploadModalOpen(false)} 
+        type="exam" 
+      />
     </div>
   );
 }
