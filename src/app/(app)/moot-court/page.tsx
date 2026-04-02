@@ -35,7 +35,15 @@ export default function MootCourtPage() {
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // Small timeout to ensure DOM content is rendered
+      setTimeout(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTo({
+            top: scrollRef.current.scrollHeight,
+            behavior: "smooth"
+          });
+        }
+      }, 100);
     }
   }, [messages, isThinking]);
 
@@ -178,7 +186,7 @@ export default function MootCourtPage() {
              </div>
            ) : (
              <>
-               <div ref={scrollRef} className="flex-1 overflow-y-auto p-10 space-y-10 no-scrollbar">
+               <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 p-10 space-y-10 custom-scroll">
                   {messages.map((m, i) => (
                     <motion.div
                       key={i}
