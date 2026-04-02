@@ -117,7 +117,7 @@ export default function MootCourtPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto h-[calc(100vh-160px)] flex flex-col gap-8 relative">
+    <div className="max-w-6xl mx-auto h-[calc(100dvh-130px)] md:h-[calc(100dvh-160px)] flex flex-col gap-4 md:gap-8 relative overflow-hidden">
       
       {/* Header Info */}
       <header className="flex flex-col md:flex-row items-center justify-between gap-6 border-b border-white/5 pb-10">
@@ -151,7 +151,7 @@ export default function MootCourtPage() {
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-8">
         
         {/* Left Side: Chat Area */}
-        <div className="flex-1 flex flex-col glass rounded-[48px] border-white/5 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col glass rounded-[32px] md:rounded-[48px] border-white/5 overflow-hidden relative">
            
            {!scenarioName ? (
              <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-10">
@@ -186,7 +186,11 @@ export default function MootCourtPage() {
              </div>
            ) : (
              <>
-               <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 p-10 space-y-10 custom-scroll">
+               <div 
+                 ref={scrollRef} 
+                 className="flex-1 overflow-y-auto min-h-0 p-6 md:p-10 space-y-8 md:space-y-10 custom-scroll overscroll-contain"
+                 style={{ WebkitOverflowScrolling: 'touch' }}
+               >
                   {messages.map((m, i) => (
                     <motion.div
                       key={i}
