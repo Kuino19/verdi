@@ -42,7 +42,7 @@ export default function MootCourtPage() {
   // Start a new session
   const startSession = async (scenario: string) => {
     setScenarioName(scenario);
-    setMessages([]);
+    setMessages([{ role: "assistant", content: "👨‍⚖️ THE COURT CLERK: All-rise! The High Court of Nigerian Legal Logic is now in session. The Honorable AI Justice presiding. Counsel, you may approach the bench and state your case." }]);
     setIsGameOver(false);
     setXpAwarded(0);
     setIsThinking(true);
@@ -57,7 +57,7 @@ export default function MootCourtPage() {
         })
       });
       const data = await res.json();
-      setMessages([{ role: "assistant", content: data.content }]);
+      setMessages(prev => [...prev, { role: "assistant", content: data.content }]);
     } catch (e) {
       console.error(e);
     } finally {
@@ -182,16 +182,31 @@ export default function MootCourtPage() {
                   {messages.map((m, i) => (
                     <motion.div
                       key={i}
-                      initial={{ opacity: 0, x: m.role === 'user' ? 20 : -20 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
                       className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                       <div className={`max-w-[85%] p-8 rounded-[36px] italic leading-relaxed text-sm md:text-base border shadow-xl ${
+                       <div className={`max-w-[85%] p-8 rounded-[36px] italic leading-relaxed text-sm md:text-base border shadow-2xl relative ${
                          m.role === 'user' 
                           ? 'bg-primary text-background border-primary' 
-                          : 'glass border-white/10 text-foreground'
+                          : m.content.toUpperCase().includes("VERDI VERDICT") 
+                            ? 'bg-amber-500/10 border-amber-500/30 text-amber-50 shadow-[0_0_50px_rgba(245,158,11,0.15)] bg-[url("https://www.transparenttextures.com/patterns/carbon-fibre.png")]'
+                            : 'glass border-white/10 text-foreground'
                        }`}>
-                          {m.content}
+                          {m.content.toUpperCase().includes("VERDI VERDICT") && (
+                            <div className="flex flex-col items-center mb-6 pt-4 border-b border-amber-500/20 pb-6">
+                               <Gavel className="w-12 h-12 text-amber-500 mb-4 animate-bounce" />
+                               <h2 className="text-2xl font-black text-amber-500 uppercase tracking-[0.3em]">Final Judgment</h2>
+                            </div>
+                          )}
+                          <div className={m.role === 'assistant' && m.content.includes("👨‍⚖️") ? "font-black text-primary border-b border-primary/10 pb-4 mb-4" : ""}>
+                             {m.content}
+                          </div>
+                          {m.role === 'assistant' && !m.content.includes("👨‍⚖️") && (
+                             <div className="absolute -left-2 -top-2 w-8 h-8 glass rounded-full flex items-center justify-center border-white/10">
+                                <Scale className="w-4 h-4 text-primary" />
+                             </div>
+                          )}
                        </div>
                     </motion.div>
                   ))}

@@ -11,13 +11,18 @@ export default function SubscriptionPage() {
   const { uid, userEmail, userName, isPremium } = useUserContext();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [plan, setPlan] = useState<"3days" | "weekly" | "monthly">("monthly");
 
-  const amount = 500000; // 5000 NGN in kobo
+  const plans = {
+    "3days": { label: "3 Days Access", amount: 500 * 100, price: "₦500", desc: "Short term intensive prep" },
+    "weekly": { label: "Weekly Access", amount: 1000 * 100, price: "₦1,000", desc: "One week of power study" },
+    "monthly": { label: "Monthly Access", amount: 3500 * 100, price: "₦3,500", desc: "The ultimate law degree companion" }
+  };
 
   const config = {
     reference: (new Date()).getTime().toString(),
     email: userEmail,
-    amount: amount,
+    amount: plans[plan].amount,
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "pk_test_placeholder",
     metadata: {
       custom_fields: [
@@ -25,6 +30,11 @@ export default function SubscriptionPage() {
           display_name: "UID",
           variable_name: "uid",
           value: uid,
+        },
+        {
+          display_name: "Plan",
+          variable_name: "plan",
+          value: plan
         }
       ]
     }
@@ -50,7 +60,7 @@ export default function SubscriptionPage() {
 
   const componentProps = {
     ...config,
-    text: loading ? "Upgrading..." : "Pay ₦5,000 / month",
+    text: loading ? "Upgrading..." : `Pay ${plans[plan].price} / ${plan === "3days" ? "3 days" : plan === "weekly" ? "week" : "month"}`,
     onSuccess: (reference: any) => handlePaystackSuccessAction(reference),
     onClose: handlePaystackCloseAction,
   };
@@ -90,8 +100,26 @@ export default function SubscriptionPage() {
             <Shield className="w-6 h-6 text-primary" />
           </div>
           <h2 className="text-xl font-bold text-primary">Verdi Premium</h2>
-          <p className="text-3xl font-extrabold pb-4 border-b border-white/[0.06]">₦5,000 <span className="text-base text-muted font-medium">/month</span></p>
-          <ul className="space-y-4 text-sm text-foreground">
+          
+          <div className="space-y-4">
+            {(Object.keys(plans) as Array<keyof typeof plans>).map((p) => (
+              <button 
+                key={p} 
+                onClick={() => setPlan(p)}
+                className={`w-full text-left p-4 rounded-2xl border transition-all ${plan === p ? 'border-primary bg-primary/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}
+              >
+                 <div className="flex justify-between items-center">
+                    <div>
+                       <p className="font-bold text-sm">{plans[p].label}</p>
+                       <p className="text-[10px] text-muted">{plans[p].desc}</p>
+                    </div>
+                    <p className="font-black text-primary">{plans[p].price}</p>
+                 </div>
+              </button>
+            ))}
+          </div>
+
+          <ul className="space-y-4 text-sm text-foreground pt-4 border-t border-white/5">
             <li className="flex gap-3"><Check className="w-4 h-4 text-primary shrink-0" /> Unlimited AI Legal Tutor Interactions</li>
             <li className="flex gap-3"><Check className="w-4 h-4 text-primary shrink-0" /> Automated case summaries & briefs</li>
             <li className="flex gap-3"><Check className="w-4 h-4 text-primary shrink-0" /> Over 5,000+ Past Questions spanning all universities</li>

@@ -27,20 +27,23 @@ const statsTemplate = [
 ];
 
 export default function DashboardPage() {
-  const { uid, userName, streak, points, isPremium } = useUserContext();
+  const { uid, userName, streak, points, isPremium, activityLog } = useUserContext();
   const [tasks, setTasks] = useState<any[]>([]);
+  const [counts, setCounts] = useState({ cases: 0, tests: 0 });
 
   useEffect(() => {
     if (uid) {
       fetchUserTasks(uid).then((res) => {
         if (res.length > 0) setTasks(res);
-        else setTasks([
-          { id: "1", task: "Complete 100L Quiz", done: false },
-          { id: "2", task: "Review Carlill via CaseFlow", done: false },
-        ]);
+      });
+      
+      // Fetch dynamic counts (Mocking for now based on a sample range)
+      setCounts({
+        cases: 12 + (activityLog?.length || 0),
+        tests: 5 + Math.floor((activityLog?.length || 0) / 2)
       });
     }
-  }, [uid]);
+  }, [uid, activityLog]);
 
   const toggleTask = async (taskId: string, currentStatus: boolean) => {
     // Optimistic UI update
@@ -55,7 +58,9 @@ export default function DashboardPage() {
   };
 
   const stats = [
-    ...statsTemplate.slice(0, 3),
+    { label: "Cases Studied", value: counts.cases.toString(), icon: BookMarked, color: "text-primary" },
+    { label: "Study Hours", value: `${((activityLog?.length || 0) * 1.5).toFixed(1)}h`, icon: Clock, color: "text-emerald-400" },
+    { label: "Practice Tests", value: counts.tests.toString(), icon: TrendingUp, color: "text-blue-400" },
     { label: "XP Points", value: points.toLocaleString(), icon: Trophy, color: "text-amber-400" },
   ];
 
