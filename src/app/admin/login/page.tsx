@@ -10,7 +10,9 @@ import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
-export default function AdminLoginPage() {
+import { Suspense } from "react";
+
+function AdminLoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -194,5 +196,17 @@ export default function AdminLoginPage() {
         </div>
       </motion.div>
     </main>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0B1120] flex items-center justify-center p-6">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <AdminLoginForm />
+    </Suspense>
   );
 }
