@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUserContext } from "@/components/app/UserContext";
-import { addPoints } from "@/lib/firebase/db";
+import { addPoints, incrementUsage } from "@/lib/firebase/db";
+import PremiumGuard from "@/components/shared/PremiumGuard";
 import Confetti from "@/components/app/Confetti";
 
 interface ExamQuestion {
@@ -25,7 +26,7 @@ interface ExamQuestion {
 }
 
 export default function ExamGeneratorPage() {
-  const { uid, isPremium } = useUserContext();
+  const { uid, isPremium, examCount } = useUserContext();
   const [topic, setTopic] = useState("");
   const [numQuestions, setNumQuestions] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -88,6 +89,9 @@ export default function ExamGeneratorPage() {
       setCurrentIndex(0);
       setSelectedAnswers({});
       setIsCompleted(false);
+      
+      // Update Trial Usage
+      if (uid) incrementUsage(uid, "examCount");
     } catch (error: any) {
       console.error("Exam Gen Error:", error);
       setErrorMsg(error.message);
@@ -125,57 +129,66 @@ export default function ExamGeneratorPage() {
 
       {/* TOPIC INPUT VIEW */}
       {questions.length === 0 && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="glass p-16 rounded-[48px] border-white/5 flex flex-col items-center justify-center text-center relative"
-        >
-          <div className="w-24 h-24 rounded-[32px] bg-primary/10 flex items-center justify-center mb-8">
-            <BookOpen className="w-10 h-10 text-primary" />
-          </div>
-          <h3 className="text-2xl font-bold mb-4 italic">What do you want to study?</h3>
-          <p className="text-muted max-w-sm mx-auto leading-relaxed mb-8">
-            Enter a Nigerian law topic (e.g. "Law of Torts", "Constitution", "Land Law") and Verdi will generate a custom quiz.
-          </p>
-
-          <form onSubmit={handleGenerate} className="w-full max-w-md space-y-4">
-             <input 
-               type="text" 
-               placeholder="e.g. Principles of Equity..." 
-               value={topic}
-               onChange={(e) => setTopic(e.target.value)}
-               disabled={isGenerating}
-               required
-               className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-center focus:outline-none focus:border-primary/50 transition-colors" 
-             />
-             
-             <div className="flex gap-4">
-                <select 
-                  value={numQuestions} 
-                  onChange={(e) => setNumQuestions(Number(e.target.value))}
-                  disabled={isGenerating || !isPremium}
-                  className="bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none disabled:opacity-50"
-                  title={!isPremium ? "Premium feature" : ""}
-                >
-                   <option value={5}>5 Questions</option>
-                   <option value={10}>10 Questions</option>
-                   <option value={20}>20 Questions</option>
-                </select>
-                <button 
-                  type="submit" 
-                  disabled={isGenerating || !topic.trim()}
-                  className="flex-1 bg-primary text-background font-black rounded-2xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-5 h-5" /> Generate Exam</>}
-                </button>
+         <PremiumGuard isFeatureLocked={!isPremium && examCount >= 1}>
+           <motion.div 
+             initial={{ opacity: 0, scale: 0.95 }}
+             animate={{ opacity: 1, scale: 1 }}
+             className="glass p-16 rounded-[48px] border-white/5 flex flex-col items-center justify-center text-center relative"
+           >
+             <div className="w-24 h-24 rounded-[32px] bg-primary/10 flex items-center justify-center mb-8">
+               <BookOpen className="w-10 h-10 text-primary" />
              </div>
-             {errorMsg && (
-               <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-xs font-bold mt-4">
-                 {errorMsg}
-               </div>
+             
+             {!isPremium && examCount === 0 && (
+                <div className="mb-8 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-full text-[10px] font-black uppercase tracking-widest italic">
+                   Free Trial: 1 Mock Exam Included
+                </div>
              )}
-          </form>
-        </motion.div>
+
+             <h3 className="text-2xl font-bold mb-4 italic">What do you want to study?</h3>
+             <p className="text-muted max-w-sm mx-auto leading-relaxed mb-8">
+               Enter a Nigerian law topic (e.g. "Law of Torts", "Land Law") and Verdi will generate a custom quiz.
+             </p>
+
+             <form onSubmit={handleGenerate} className="w-full max-w-md space-y-4">
+                <input 
+                  type="text" 
+                  placeholder="e.g. Principles of Equity..." 
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  disabled={isGenerating}
+                  required
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-center focus:outline-none focus:border-primary/50 transition-colors" 
+                />
+                
+                <div className="flex gap-4">
+                   <select 
+                     value={numQuestions} 
+                     onChange={(e) => setNumQuestions(Number(e.target.value))}
+                     disabled={isGenerating || !isPremium}
+                     className="bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none disabled:opacity-50"
+                     title={!isPremium ? "Premium feature" : ""}
+                   >
+                      <option value={5}>5 Questions</option>
+                      <option value={10}>10 Questions</option>
+                      <option value={20}>20 Questions</option>
+                   </select>
+                   <button 
+                     type="submit" 
+                     disabled={isGenerating || !topic.trim()}
+                     className="flex-1 bg-primary text-background font-black rounded-2xl flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
+                   >
+                     {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-5 h-5" /> Generate Exam</>}
+                   </button>
+                </div>
+                {errorMsg && (
+                  <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl text-xs font-bold mt-4">
+                    {errorMsg}
+                  </div>
+                )}
+             </form>
+           </motion.div>
+         </PremiumGuard>
       )}
 
       {/* ACTIVE QUIZ VIEW */}

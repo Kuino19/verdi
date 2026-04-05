@@ -6,7 +6,11 @@ import { useState, useRef, useEffect } from "react";
 import { useUserContext } from "@/components/app/UserContext";
 import { db } from "@/lib/firebase/client";
 import { collection, doc, getDocs, setDoc, updateDoc, query, orderBy, serverTimestamp, deleteDoc } from "firebase/firestore";
-import { addPoints } from "@/lib/firebase/db";
+import { addPoints, incrementUsage } from "@/lib/firebase/db";
+import { logEvent, EVENTS } from "@/lib/firebase/analytics-utils";
+import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const suggestedPrompts = [
   "Explain Promissory Estoppel",
@@ -16,7 +20,7 @@ const suggestedPrompts = [
 ];
 
 export default function AssistantPage() {
-  const { uid, userName, isPremium } = useUserContext();
+  const { uid, userName, isPremium, aiUsageCount } = useUserContext();
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -86,9 +90,15 @@ export default function AssistantPage() {
     if (!content.trim() || isTyping) return;
     
     // Limits
-    if (!isPremium && messages.length > 20) {
-       alert("You've reached your free query limit for this chat. Please upgrade to Premium.");
-       return;
+    if (!isPremium) {
+       if (aiUsageCount >= 5) {
+          alert("Daily free query limit (5) reached. Upgrade to Pro for unlimited tutor access!");
+          return;
+       }
+       if (messages.length > 20) {
+          alert("Chat length limit reached for free plan. Please start a new chat or upgrade for unlimited history.");
+          return;
+       }
     }
 
     const userMessage = { role: "user", content, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
@@ -96,6 +106,12 @@ export default function AssistantPage() {
     setMessages(newMessages);
     if (!text) setInput("");
     setIsTyping(true);
+
+    // Track AI Query Event
+    logEvent(EVENTS.AI_QUERY, {
+      message_length: content.length,
+      is_new_thread: !activeThreadId
+    });
 
     try {
       const res = await fetch("/api/ai", {
@@ -106,27 +122,54 @@ export default function AssistantPage() {
           type: "assistant"
         }),
       });
-      const data = await res.json();
+
+      if (!res.ok) throw new Error("Connection failed");
       
-      let finalMessages = newMessages;
-      if (data.content) {
-        const assistantMsg = { role: "assistant", content: data.content, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-        finalMessages = [...newMessages, assistantMsg];
-        setMessages(finalMessages);
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error("No reader");
+
+      // Initialize assistant message
+      const assistantMsg = { 
+        role: "assistant", 
+        content: "", 
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+      };
+      
+      setMessages(prev => [...prev, assistantMsg]);
+      setIsTyping(false);
+
+      let accumulatedContent = "";
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
         
-        // Award XP for engaging with the tutor
-        if (uid) addPoints(uid, 2);
-      } else {
-        throw new Error(data.details || "No response");
+        const chunk = decoder.decode(value, { stream: true });
+        accumulatedContent += chunk;
+        
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...assistantMsg, content: accumulatedContent };
+          return updated;
+        });
       }
 
+      const finalMessages = [...newMessages, { ...assistantMsg, content: accumulatedContent }];
+
       if (uid) {
-        // Handle Thread Saving
+        addPoints(uid, 2);
+        incrementUsage(uid, "aiUsageCount");
+        
+        logEvent(EVENTS.AI_QUERY + "_complete", {
+          content_length: accumulatedContent.length,
+          thread_id: activeThreadId || "new"
+        });
+
         let currentThreadId = activeThreadId;
-        const threadTitle = content.split(" ").slice(0, 4).join(" ") + "..."; // Auto title
+        const threadTitle = content.split(" ").slice(0, 4).join(" ") + "...";
         
         if (!currentThreadId) {
-          // Create new document reference manually so we can set its ID
           const newThreadRef = doc(collection(db, "users", uid, "chatThreads"));
           currentThreadId = newThreadRef.id;
           setActiveThreadId(currentThreadId);
@@ -140,7 +183,6 @@ export default function AssistantPage() {
           await setDoc(newThreadRef, newThreadData);
           setThreads(prev => [newThreadData, ...prev]);
         } else {
-          // Update existing
           const threadRef = doc(db, "users", uid, "chatThreads", currentThreadId);
           await updateDoc(threadRef, {
             messages: finalMessages,
@@ -150,7 +192,8 @@ export default function AssistantPage() {
         }
       }
 
-    } catch {
+    } catch (error) {
+      console.error("Chat Error:", error);
       setMessages(prev => [...prev, { role: "assistant", content: "Something went wrong. Please try again.", time: "Just now" }]);
     } finally {
       setIsTyping(false);
@@ -256,12 +299,14 @@ export default function AssistantPage() {
                   }
                 </div>
                 <div>
-                  <div className={`px-5 py-4 text-[13px] md:text-sm leading-relaxed whitespace-pre-wrap ${
+                  <div className={`px-5 py-4 text-[13px] md:text-sm leading-relaxed prose prose-invert prose-p:leading-relaxed prose-pre:bg-white/5 prose-pre:border prose-pre:border-white/10 ${
                     m.role === 'user'
-                      ? 'bg-primary/10 rounded-3xl rounded-br-sm'
+                      ? 'bg-primary/10 rounded-3xl rounded-br-sm prose-p:m-0'
                       : 'bg-white/[0.04] border border-white/[0.06] rounded-3xl rounded-bl-sm'
                   }`}>
-                    {m.content}
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {m.content}
+                    </ReactMarkdown>
                   </div>
                   <div className={`flex items-center gap-2 mt-2 px-1 ${m.role === 'user' ? 'justify-end' : ''}`}>
                     <span className="text-[10px] uppercase tracking-widest text-muted/60 font-medium">{m.time}</span>

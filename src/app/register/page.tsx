@@ -101,6 +101,19 @@ export default function RegisterPage() {
   const inputClass = "w-full bg-slate-900/60 border border-white/5 rounded-2xl py-3.5 pl-11 pr-4 focus:outline-none focus:border-primary/50 transition-all text-sm";
   const labelClass = "block text-xs font-bold mb-2 text-muted uppercase tracking-wider";
 
+  const handleResendEmail = async () => {
+    if (!auth.currentUser) return;
+    setIsLoading(true);
+    try {
+      await sendEmailVerification(auth.currentUser);
+      alert("Verification email resent!");
+    } catch (err: any) {
+      setError(err.message || "Failed to resend email.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (success) {
     return (
       <main className="min-h-screen flex items-center justify-center p-6 bg-[#0B1120] relative overflow-hidden">
@@ -120,12 +133,23 @@ export default function RegisterPage() {
               <strong className="text-foreground">{form.email}</strong>.{" "}
               Click it to activate your account and start learning.
             </p>
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-background font-black rounded-2xl hover:scale-105 transition-all"
-            >
-              Back to Sign In <ArrowRight className="w-4 h-4" />
-            </Link>
+            
+            <div className="flex flex-col gap-4">
+              <Link
+                href="/login"
+                className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-background font-black rounded-2xl hover:scale-105 transition-all justify-center"
+              >
+                Back to Sign In <ArrowRight className="w-4 h-4" />
+              </Link>
+              
+              <button 
+                onClick={handleResendEmail}
+                disabled={isLoading}
+                className="text-xs font-bold text-muted hover:text-primary transition-colors py-2"
+              >
+                {isLoading ? "Resending..." : "Didn't get the email? Resend Link"}
+              </button>
+            </div>
           </div>
         </motion.div>
       </main>
@@ -234,15 +258,35 @@ export default function RegisterPage() {
                   <select required value={form.university} onChange={set("university")}
                     className="w-full bg-slate-900/60 border border-white/5 rounded-2xl py-3.5 pl-11 pr-4 focus:outline-none focus:border-primary/50 transition-all text-sm appearance-none cursor-pointer">
                     <option value="" disabled>Select your university</option>
-                    <option value="unilag">University of Lagos (UNILAG)</option>
-                    <option value="ui">University of Ibadan (UI)</option>
-                    <option value="abu">Ahmadu Bello University (ABU)</option>
-                    <option value="unn">University of Nigeria, Nsukka (UNN)</option>
-                    <option value="lasu">Lagos State University (LASU)</option>
-                    <option value="oau">Obafemi Awolowo University (OAU)</option>
-                    <option value="covenant">Covenant University</option>
-                    <option value="buk">Bayero University, Kano (BUK)</option>
-                    <option value="uniben">University of Benin (UNIBEN)</option>
+                    <optgroup label="Federal Universities">
+                      <option value="ui">University of Ibadan (UI)</option>
+                      <option value="unilag">University of Lagos (UNILAG)</option>
+                      <option value="unn">University of Nigeria, Nsukka (UNN)</option>
+                      <option value="oau">Obafemi Awolowo University (OAU)</option>
+                      <option value="abu">Ahmadu Bello University (ABU)</option>
+                      <option value="unilorin">University of Ilorin (UNILORIN)</option>
+                      <option value="uniben">University of Benin (UNIBEN)</option>
+                      <option value="unijos">University of Jos (UNIJOS)</option>
+                      <option value="unical">University of Calabar (UNICAL)</option>
+                      <option value="unizik">Nnamdi Azikiwe University (UNIZIK)</option>
+                      <option value="unimaid">University of Maiduguri (UNIMAID)</option>
+                      <option value="buk">Bayero University, Kano (BUK)</option>
+                    </optgroup>
+                    <optgroup label="State Universities">
+                      <option value="lasu">Lagos State University (LASU)</option>
+                      <option value="delsu">Delta State University (DELSU)</option>
+                      <option value="oou">Olabisi Onabanjo University (OOU)</option>
+                      <option value="aau">Ambrose Alli University (AAU)</option>
+                      <option value="rsu">Rivers State University (RSU)</option>
+                    </optgroup>
+                    <optgroup label="Private Universities">
+                      <option value="abuad">Afe Babalola University (ABUAD)</option>
+                      <option value="babcock">Babcock University</option>
+                      <option value="baze">Baze University</option>
+                      <option value="covenant">Covenant University</option>
+                      <option value="igbinedion">Igbinedion University</option>
+                      <option value="pau">Pan-Atlantic University</option>
+                    </optgroup>
                     <option value="other">Other University</option>
                   </select>
                 </div>

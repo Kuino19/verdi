@@ -1,13 +1,24 @@
 import { Groq } from "groq-sdk";
-import { NextResponse } from "next/server";
+import { FlashcardGenerateSchema } from "@/lib/validators/schemas";
+import { validateSessionCookie } from "@/lib/api/auth-middleware";
+import { handleError, createSuccessResponse } from "@/lib/errors/handler";
+import { AppError } from "@/lib/errors/AppError";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: Request) {
+  const requestId = crypto.randomUUID();
   try {
-    const { title, text } = await req.json();
-
-    if (!title || !text) {
-      return NextResponse.json({ error: "Missing title or text" }, { status: 400 });
+    // Validate session
+    const authData = await validateSessionCookie(req as any);
+    if (!authData) {
+      throw AppError.unauthorized("Session expired or invalid");
     }
+
+    const body = await req.json();
+    
+    // Validate request payload
+    const validatedData = FlashcardGenerateSchema.parse(body);
+    const { text, count, difficulty } = validatedData;
 
     const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     
@@ -30,31 +41,39 @@ export async function POST(req: Request) {
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile",
-      temperature: 0.1, // Keep it deterministic for JSON parsing
-      response_format: { type: "json_object" } // Using json mode if supported, or rely on prompt
+      temperature: 0.1,
+      response_format: { type: "json_object" }
     });
 
     let raw = completion.choices?.[0]?.message?.content || "";
+    if (!raw) {
+      throw AppError.internal("No response from AI model");
+    }
     
-    // Parse the JSON. If it returned {"flashcards": [...]}, extract it.
+    // Parse the JSON
     let cards = [];
     try {
       const parsed = JSON.parse(raw);
       cards = Array.isArray(parsed) ? parsed : (parsed.flashcards || Object.values(parsed)[0]);
-    } catch (e) {
-      // Fallback regex if it wrapped it in text
-      const match = raw.match(/\[([\s\S]*?)\]/);
-      if (match) {
-        cards = JSON.parse(match[0]);
-      } else {
-         throw new Error("Could not parse JSON from AI response.");
+      
+      if (!Array.isArray(cards) || cards.length === 0) {
+        throw new Error("Invalid flashcard format");
       }
+    } catch (e) {
+      throw AppError.badRequest(
+        "Failed to parse AI response",
+        e instanceof Error ? e.message : "Invalid JSON from AI"
+      );
     }
 
-    return NextResponse.json({ flashcards: cards });
+    logger.info("Flashcards generated successfully", { uid: authData.uid, count: cards.length, requestId });
+    return createSuccessResponse({ flashcards: cards }, 200);
 
-  } catch (error: any) {
-    console.error("Flashcard generation error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    logger.error("Flashcard generation error", { 
+      error: error instanceof Error ? error.message : String(error), 
+      requestId 
+    });
+    return handleError(error, requestId);
   }
 }

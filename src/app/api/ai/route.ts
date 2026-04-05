@@ -1,65 +1,57 @@
-import { groq } from "@/lib/groq/client";
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
+export const dynamic = "force-dynamic";
+import { AiVault } from "@/lib/ai/vault";
+import { AIRequestSchema } from "@/lib/validators/schemas";
+import { validateSessionCookie } from "@/lib/api/auth-middleware";
+import { handleError, createSuccessResponse } from "@/lib/errors/handler";
+import { AppError } from "@/lib/errors/AppError";
+import { adminDb } from "@/lib/firebase/admin";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: Request) {
+  const requestId = crypto.randomUUID();
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("session")?.value;
-
-    if (!sessionCookie) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate session
+    const authData = await validateSessionCookie(req as any);
+    if (!authData) {
+      throw AppError.unauthorized("Session expired or invalid");
     }
 
-    let decodedClaims;
-    try {
-      decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
-    } catch (error) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const uid = authData.uid;
+    const body = await req.json();
 
-    const uid = decodedClaims.uid;
-    let isPremium = false;
+    // Validate request payload
+    const validatedData = AIRequestSchema.parse(body);
+    const { messages, type = "assistant" } = validatedData;
 
-    // Subscription & Rate Limiting Verification
+    // Check user subscription and rate limiting
     const userRef = adminDb.collection("users").doc(uid);
     const userDoc = await userRef.get();
     
-    if (userDoc.exists) {
-      const data = userDoc.data();
-      isPremium = !!data?.isPremium;
-      
-      if (!isPremium) {
-        // Daily rate limit logic for FREE tier
-        const today = new Date().toISOString().split("T")[0]; // e.g. "2026-04-01"
-        const aiUsage = data?.aiUsage || { date: today, count: 0 };
-        
-        if (aiUsage.date !== today) {
-          // Reset count for a new day
-          aiUsage.date = today;
-          aiUsage.count = 1;
-          await userRef.update({ aiUsage });
-        } else {
-          if (aiUsage.count >= 50) {
-            // Free limit hit
-            return NextResponse.json({ 
-              error: "Rate limit exceeded", 
-              details: "You have reached your limit of 50 free daily AI queries. Upgrade to Premium for unlimited access." 
-            }, { status: 429 });
-          } else {
-            // Increment
-            aiUsage.count += 1;
-            await userRef.update({ aiUsage });
-          }
-        }
-      }
+    if (!userDoc.exists) {
+      throw AppError.notFound("User profile not found");
     }
 
-    const { messages, type = "assistant" } = await req.json();
-
-    if (!Array.isArray(messages) || messages.length > 20) {
-      return NextResponse.json({ error: "Invalid request payload" }, { status: 400 });
+    const userData = userDoc.data();
+    const isPremium = !!userData?.isPremium;
+    
+    if (!isPremium) {
+      // Daily rate limit logic for FREE tier
+      const today = new Date().toISOString().split("T")[0];
+      const aiUsage = userData?.aiUsage || { date: today, count: 0 };
+      
+      if (aiUsage.date !== today) {
+        aiUsage.date = today;
+        aiUsage.count = 1;
+        await userRef.update({ aiUsage });
+      } else if (aiUsage.count >= 50) {
+        throw AppError.tooManyRequests(
+          "Rate limit exceeded",
+          "You have reached your limit of 50 free daily AI queries. Upgrade to Premium for unlimited access."
+        );
+      } else {
+        aiUsage.count += 1;
+        await userRef.update({ aiUsage });
+      }
     }
 
     let systemPrompt = "You are VERDI, a premium legal AI assistant for Nigerian law students. Be professional, academically rigorous, and helpful. Use Nigerian legal precedents where applicable.";
@@ -85,22 +77,38 @@ Ensure the summary is highly academic, cites any supporting Nigerian laws or pre
       }))
     ];
 
-    const chatCompletion = await groq.chat.completions.create({
-      messages: groqMessages as any,
-      model: "llama-3.3-70b-versatile",
-      temperature: 0.7,
-      max_tokens: 2048,
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          const aiStream = AiVault.executeStream(groqMessages, {
+            type: type as any,
+            temperature: 0.7,
+            maxTokens: 2048,
+          });
+
+          for await (const chunk of aiStream) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+        } catch (error) {
+          logger.error("Streaming Error", { error: String(error) });
+          controller.error(error);
+        }
+      },
     });
 
-    return NextResponse.json({
-      content: chatCompletion.choices[0]?.message?.content || "I'm sorry, I couldn't process that request.",
+    logger.info("AI streaming request started", { uid, type, requestId });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
     });
 
-  } catch (error: any) {
-    console.error("AI API Error Full Details:", error);
-    return NextResponse.json({ 
-      error: "Failed to generate AI response",
-      details: error.message 
-    }, { status: 500 });
+  } catch (error) {
+    logger.error("AI API Error", { error: error instanceof Error ? error.message : String(error), requestId });
+    return handleError(error, requestId);
   }
 }

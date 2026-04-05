@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { fetchCaseById, addPoints } from "@/lib/firebase/db";
+import { fetchCaseById, addPoints, fetchSimilarCases } from "@/lib/firebase/db";
 import { useUserContext } from "@/components/app/UserContext";
 import { db } from "@/lib/firebase/client";
 import { collection, addDoc } from "firebase/firestore";
@@ -23,9 +23,15 @@ import {
   Zap,
   Play,
   Pause,
-  Square
+  Square,
+  Star,
+  ChevronRight,
+  ArrowRight
 } from "lucide-react";
 import Link from "next/link";
+import { logEvent, EVENTS } from "@/lib/firebase/analytics-utils";
+import CaseFlow from "@/components/app/CaseFlow";
+
 export default function CaseDetailPage() {
   const params = useParams();
   const caseId = params?.id as string;
@@ -42,9 +48,10 @@ export default function CaseDetailPage() {
 
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [caseData, setCaseData] = useState<any>(null);
+  const [similarCases, setSimilarCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  const { uid } = useUserContext();
+  const { uid, isPremium } = useUserContext();
 
   // Highlighting State
   const [highlightedText, setHighlightedText] = useState("");
@@ -53,8 +60,22 @@ export default function CaseDetailPage() {
   useEffect(() => {
     async function load() {
       if (!caseId) return;
-      const data = await fetchCaseById(caseId);
+      const data: any = await fetchCaseById(caseId);
       setCaseData(data);
+      
+      if (data?.subject) {
+        const similar = await fetchSimilarCases(data.subject, caseId);
+        setSimilarCases(similar);
+        
+        // Track Case Content View
+        logEvent(EVENTS.CASE_VIEW, {
+          case_id: caseId,
+          case_title: data.title,
+          case_subject: data.subject,
+          case_year: data.year
+        });
+      }
+      
       setLoading(false);
     }
     load();
@@ -208,6 +229,9 @@ export default function CaseDetailPage() {
     window.speechSynthesis.speak(utterance);
     setIsPlaying(true);
     setIsPaused(false);
+    
+    // Track Audio Start
+    logEvent(EVENTS.AUDIO_PLAY, { case_id: caseId });
   };
   
   const stopListening = () => {
@@ -222,7 +246,8 @@ export default function CaseDetailPage() {
     { id: "facts", label: "Facts of the Case", icon: BookOpen },
     { id: "issues", label: "Legal Issues", icon: AlertCircle },
     { id: "reasoning", label: "Court's Reasoning", icon: Gavel },
-    { id: "decision", label: "Final Decision", icon: Scale }
+    { id: "decision", label: "Final Decision", icon: Scale },
+    { id: "caseflow", label: "CaseFlow Map", icon: Zap, premium: true }
   ];
 
   if (loading) {
@@ -295,7 +320,10 @@ export default function CaseDetailPage() {
            {tabs.map((tab) => (
              <button
                key={tab.id}
-               onClick={() => setActiveTab(tab.id)}
+               onClick={() => {
+                 setActiveTab(tab.id);
+                 logEvent(EVENTS.TAB_CHANGE, { tab_id: tab.id, case_id: caseId });
+              }}
                className={`w-full flex items-center gap-3 p-4 rounded-2xl transition-all border text-left ${
                  activeTab === tab.id 
                    ? "bg-primary/20 text-primary border-primary/30" 
@@ -402,6 +430,62 @@ export default function CaseDetailPage() {
                          <p className="text-xl italic mb-6 whitespace-pre-wrap leading-relaxed">{caseData.decision || "Pending verdict processing."}</p>
                       </div>
                    </div>
+                </div>
+              )}
+               {activeTab === "caseflow" && (
+                <div className="space-y-6 h-full flex flex-col">
+                   <h3 className="text-2xl font-bold flex items-center justify-between italic">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                          <Zap className="w-5 h-5 text-primary" />
+                        </div>
+                        CaseFlow Relationship Map
+                      </div>
+                      {!isPremium && (
+                        <span className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-lg text-[10px] font-black uppercase tracking-widest italic">PRO FEATURE</span>
+                      )}
+                   </h3>
+
+                   {!isPremium ? (
+                     <div className="flex-1 relative min-h-[500px] rounded-[40px] overflow-hidden border border-white/5 bg-slate-950/50 flex flex-col items-center justify-center text-center p-12">
+                        <div className="absolute inset-0 opacity-20 grayscale blur-xl pointer-events-none">
+                           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[300px] border-2 border-primary/30 rounded-[100px] rotate-12" />
+                           <div className="absolute top-1/3 left-1/4 w-32 h-12 bg-primary/20 rounded-full" />
+                           <div className="absolute bottom-1/4 right-1/3 w-48 h-12 bg-blue-500/20 rounded-full" />
+                        </div>
+
+                        <div className="relative z-10 space-y-6">
+                           <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-primary/20 shadow-2xl shadow-primary/20">
+                              <Zap className="w-8 h-8 text-primary fill-primary" />
+                           </div>
+                           <h4 className="text-3xl font-bold italic tracking-tight">Visualize the <span className="text-primary italic">Logic of Law</span></h4>
+                           <p className="text-muted text-sm max-w-sm mx-auto leading-relaxed">
+                              Free users can see case summaries. <span className="text-foreground font-bold">VERDI Pro</span> users get interactive maps showing exactly how cases overrule, follow, or distinguish one another.
+                           </p>
+                           <Link 
+                            href="/upgrade"
+                            onClick={() => logEvent(EVENTS.PREMIUM_UPGRADE_CLICK, { origin: "caseflow_teaser", case_id: caseId })}
+                            className="inline-flex items-center gap-3 px-8 py-4 bg-primary text-background rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-primary/20"
+                           >
+                              Unlock CaseFlow Explorer <ArrowRight className="w-4 h-4" />
+                           </Link>
+                        </div>
+                     </div>
+                   ) : (
+                     <div className="flex-1 min-h-[550px]">
+                        <CaseFlow 
+                          currentCase={{ 
+                            id: caseId, 
+                            title: caseData.title, 
+                            year: caseData.year 
+                          }} 
+                          links={caseData.links || [
+                            { caseId: "d-1", caseName: "Donoghue v Stevenson", type: "follows", year: 1932 },
+                            { caseId: "d-2", caseName: "Rylands v Fletcher", type: "overrules", year: 1868 }
+                          ]} 
+                        />
+                     </div>
+                   )}
                 </div>
               )}
            </motion.div>
@@ -515,6 +599,47 @@ export default function CaseDetailPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <section className="mt-20 pt-16 border-t border-white/5 pb-20">
+         <div className="flex items-center justify-between mb-10">
+            <div>
+               <h3 className="text-2xl font-bold italic mb-2">Similar <span className="text-primary italic">Cases</span></h3>
+               <p className="text-sm text-muted italic">Recommended summaries based on current legal subject: <span className="text-foreground font-bold">{caseData.subject}</span></p>
+            </div>
+            <Link href="/cases" className="text-xs font-black text-primary uppercase tracking-widest hover:underline">
+               Explore Library
+            </Link>
+         </div>
+
+         <div className="grid md:grid-cols-3 gap-6">
+            {similarCases.length === 0 ? (
+               <div className="md:col-span-3 p-12 bg-white/5 rounded-[40px] border border-dashed border-white/10 text-center italic text-muted">
+                  No other cases found in this category yet.
+               </div>
+            ) : similarCases.map((sc, i) => (
+               <Link href={`/cases/${sc.id}`} key={sc.id}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="glass p-8 rounded-[40px] border-white/5 hover:border-primary/20 transition-all group h-full flex flex-col"
+                  >
+                     <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black text-primary uppercase">{sc.year}</span>
+                        {sc.landmark && <Star className="w-3 h-3 text-amber-500 fill-amber-500" />}
+                     </div>
+                     <h4 className="font-bold mb-3 group-hover:text-primary transition-colors leading-snug">{sc.title}</h4>
+                     <p className="text-xs text-muted italic line-clamp-3 mb-6">"{sc.summary}"</p>
+                     
+                     <div className="mt-auto pt-4 flex items-center gap-2 text-[10px] font-black text-muted uppercase tracking-widest group-hover:text-foreground transition-all">
+                        Read Summary <ChevronRight className="w-3 h-3" />
+                     </div>
+                  </motion.div>
+               </Link>
+            ))}
+         </div>
+      </section>
     </div>
   );
 }
+

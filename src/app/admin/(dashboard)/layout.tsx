@@ -48,6 +48,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <BookText className="w-5 h-5 transition-colors group-hover:text-primary" />
             Case Library
           </Link>
+          <Link href="/admin/vetting" className="flex items-center gap-4 px-6 py-4 rounded-2xl hover:bg-white/5 transition-all text-sm font-bold text-muted hover:text-primary group">
+            <ShieldCheck className="w-5 h-5 transition-colors group-hover:text-primary" />
+            Judicial Vetting
+          </Link>
           <Link href="/admin/cases/new" className="flex items-center gap-4 px-6 py-4 rounded-2xl hover:bg-white/5 transition-all text-sm font-bold text-muted hover:text-primary group">
             <PlusCircle className="w-5 h-5 transition-colors group-hover:text-primary" />
             Upload Case (PDF)

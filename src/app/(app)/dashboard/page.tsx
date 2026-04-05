@@ -8,7 +8,7 @@ import {
 import Link from "next/link";
 import { useUserContext } from "@/components/app/UserContext";
 import { useState, useEffect } from "react";
-import { fetchUserTasks, updateTaskState } from "@/lib/firebase/db";
+import { fetchUserTasks, updateTaskState, fetchActiveStudyPlan } from "@/lib/firebase/db";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const masteryData = [
@@ -30,14 +30,40 @@ export default function DashboardPage() {
   const { uid, userName, streak, points, isPremium, activityLog } = useUserContext();
   const [tasks, setTasks] = useState<any[]>([]);
   const [counts, setCounts] = useState({ cases: 0, tests: 0 });
+  const [activePlan, setActivePlan] = useState<any>(null);
 
   useEffect(() => {
     if (uid) {
+      // Load standard tasks
       fetchUserTasks(uid).then((res) => {
         if (res.length > 0) setTasks(res);
       });
       
-      // Fetch dynamic counts (Mocking for now based on a sample range)
+      // Load active study plan
+      fetchActiveStudyPlan(uid).then(plan => {
+        if (plan) {
+           setActivePlan(plan);
+           // Find the first non-completed day
+           const nextDayIndex = plan.plan.findIndex((_: any, i: number) => !plan.completedDays?.includes(i));
+           if (nextDayIndex !== -1) {
+             const day = plan.plan[nextDayIndex];
+             // [x] Fix: Filter out any existing plan tasks to avoid duplicates on re-render
+             const tasksToMap = day.focusAreas || day.tasks || [];
+             const studyTasks = Array.isArray(tasksToMap) ? tasksToMap.map((t: any, idx: number) => ({
+               id: `plan-${nextDayIndex}-${idx}`,
+               task: `Study: ${t.title || t}`,
+               done: false,
+               isPlanTask: true
+             })) : [];
+             
+             setTasks(prev => {
+                const nonPlanTasks = prev.filter(t => !t.id.startsWith("plan-"));
+                return [...nonPlanTasks, ...studyTasks];
+             });
+           }
+        }
+      });
+      
       setCounts({
         cases: 12 + (activityLog?.length || 0),
         tests: 5 + Math.floor((activityLog?.length || 0) / 2)
@@ -46,13 +72,16 @@ export default function DashboardPage() {
   }, [uid, activityLog]);
 
   const toggleTask = async (taskId: string, currentStatus: boolean) => {
-    // Optimistic UI update
+    if (taskId.startsWith("plan-")) {
+       // Just a visual toggle for plan tasks for now (they should be synced to study-planner page)
+       setTasks(tasks.map(t => t.id === taskId ? { ...t, done: !currentStatus } : t));
+       return;
+    }
     setTasks(tasks.map(t => t.id === taskId ? { ...t, done: !currentStatus } : t));
     try {
       if (taskId.length > 10) await updateTaskState(uid, taskId, !currentStatus);
     } catch (e) {
       console.error(e);
-      // Revert if error
       setTasks(tasks.map(t => t.id === taskId ? { ...t, done: currentStatus } : t));
     }
   };

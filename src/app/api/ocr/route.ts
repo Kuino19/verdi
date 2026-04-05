@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { getVertexModel } from "@/lib/vertex/client";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";

@@ -2,11 +2,15 @@
 
 import Sidebar from "@/components/app/Sidebar";
 import { UserProvider, useUserContext } from "@/components/app/UserContext";
-import { Bell, LogOut, Menu, Flame, Trophy } from "lucide-react";
+import { FeatureProvider } from "@/components/app/FeatureContext";
+import { NotificationProvider } from "@/components/app/NotificationContext";
+import NotificationDropdown from "@/components/app/NotificationDropdown";
+import { LogOut, Menu, Flame, Trophy } from "lucide-react";
 import { auth } from "@/lib/firebase/client";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import FirebaseAnalytics from "@/components/shared/FirebaseAnalytics";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -37,70 +41,76 @@ export default function AppShell({ children, uid, userName, university, userEmai
   };
 
   return (
-    <UserProvider 
-      uid={uid} 
-      userName={userName || "Student"} 
-      university={university || "Nigerian University"} 
-      userEmail={userEmail || ""} 
-      isPremium={isPremium} 
-      streak={streak} 
-      points={points}
-    >
-      <div className="min-h-screen bg-[#0B1120] text-foreground flex flex-col md:flex-row">
+    <FeatureProvider>
+      <UserProvider 
+        uid={uid} 
+        userName={userName || "Student"} 
+        university={university || "Nigerian University"} 
+        userEmail={userEmail || ""} 
+        isPremium={isPremium} 
+        streak={streak} 
+        points={points}
+        aiUsageCount={0}
+        examCount={0}
+        flashcardCount={0}
+        studyPlanCount={0}
+      >
+        <NotificationProvider>
+          <FirebaseAnalytics />
+          <div className="min-h-screen bg-[#0B1120] text-foreground flex flex-col md:flex-row">
 
-        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-        <div className="flex-grow flex flex-col min-h-screen md:ml-[240px]">
+          <div className="flex-grow flex flex-col min-h-screen md:ml-[240px]">
 
-          {/* Top Bar — minimal */}
-          <header className="h-16 border-b border-white/[0.06] px-4 md:px-8 flex items-center justify-between sticky top-0 z-30 bg-[#0B1120]/80 backdrop-blur-xl">
+            {/* Top Bar — minimal */}
+            <header className="h-16 border-b border-white/[0.06] px-4 md:px-8 flex items-center justify-between sticky top-0 z-30 bg-[#0B1120]/80 backdrop-blur-xl">
 
-            {/* Left: hamburger (mobile) or page area (desktop) */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsSidebarOpen(true)}
-                className="md:hidden p-2 rounded-xl bg-white/5 text-muted hover:text-foreground transition-all"
-                aria-label="Open menu"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-              <div className="hidden md:block">
-                 <p className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-0.5 italic">Workspace</p>
-                 <p className="text-sm font-bold text-foreground">Verdi <span className="text-primary italic">Academy</span></p>
-              </div>
-              <span className="md:hidden text-lg font-black tracking-tighter text-gradient">VERDI</span>
-            </div>
-
-            {/* Stats Display (Desktop & Mobile) */}
-            <div className="flex items-center gap-2 md:gap-6">
-              <StatsDisplay />
-
-              <div className="h-4 w-[1px] bg-white/10 hidden sm:block" />
-
-              <div className="flex items-center gap-1">
-                <button className="p-2 rounded-lg text-muted hover:text-foreground transition-colors relative">
-                  <Bell className="w-4 h-4" />
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_8px_rgba(201,162,39,0.5)]" />
-                </button>
-
+              {/* Left: hamburger (mobile) or page area (desktop) */}
+              <div className="flex items-center gap-4">
                 <button
-                  onClick={handleSignOut}
-                  title="Sign out"
-                  className="p-2 rounded-lg text-muted hover:text-rose-400 transition-colors"
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="md:hidden p-2 rounded-xl bg-white/5 text-muted hover:text-foreground transition-all"
+                  aria-label="Open menu"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <Menu className="w-5 h-5" />
                 </button>
+                <div className="hidden md:block">
+                   <p className="text-[10px] font-black text-muted uppercase tracking-[0.2em] mb-0.5 italic">Workspace</p>
+                   <p className="text-sm font-bold text-foreground">Verdi <span className="text-primary italic">Academy</span></p>
+                </div>
+                <span className="md:hidden text-lg font-black tracking-tighter text-gradient">VERDI</span>
               </div>
-            </div>
-          </header>
 
-          {/* Page Content */}
-          <main className="flex-grow p-4 md:p-8 lg:p-10 max-w-[1600px] w-full mx-auto">
-            {children}
-          </main>
+              {/* Stats Display (Desktop & Mobile) */}
+              <div className="flex items-center gap-2 md:gap-6">
+                <StatsDisplay />
+
+                <div className="h-4 w-[1px] bg-white/10 hidden sm:block" />
+
+                <div className="flex items-center gap-1">
+                  <NotificationDropdown />
+
+                  <button
+                    onClick={handleSignOut}
+                    title="Sign out"
+                    className="p-2 rounded-lg text-muted hover:text-rose-400 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            {/* Page Content */}
+            <main className="flex-grow p-4 md:p-8 lg:p-10 max-w-[1600px] w-full mx-auto">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-    </UserProvider>
+        </NotificationProvider>
+      </UserProvider>
+    </FeatureProvider>
   );
 }
 

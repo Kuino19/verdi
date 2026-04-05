@@ -1,4 +1,5 @@
-import { groq } from "@/lib/groq/client";
+export const dynamic = "force-dynamic";
+import { AiVault } from "@/lib/ai/vault";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase/admin";
@@ -40,18 +41,17 @@ export async function POST(req: Request) {
     
     If the user asks for a scenario, provide a highly interesting Nigerian legal problem (e.g. Land dispute, Election petition, or Fundamental Human Rights).`;
 
-    const chatCompletion = await groq.chat.completions.create({
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages
-      ],
-      model: "llama-3.3-70b-versatile",
+    const content = await AiVault.execute([
+      { role: "system", content: systemPrompt },
+      ...messages
+    ], {
+      type: "moot-court",
       temperature: 0.6,
-      max_tokens: 2000,
+      maxTokens: 2000,
     });
 
     return NextResponse.json({
-      content: chatCompletion.choices[0]?.message?.content || "The court is currently in recess.",
+      content: content || "The court is currently in recess.",
     });
 
   } catch (error: any) {

@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { fetchAllCases } from "@/lib/firebase/db";
+import { useUserContext } from "@/components/app/UserContext";
 
 const mockCases = [
   {
@@ -88,18 +89,22 @@ const mockCases = [
 const subjects = ["All Subjects", "Tort", "Contract", "Criminal", "Company", "Constitutional", "Family", "Property"];
 
 export default function CasesPage() {
+  const { isPremium } = useUserContext();
   const [selectedSubject, setSelectedSubject] = useState("All Subjects");
   const [searchQuery, setSearchQuery] = useState("");
-  const [cases, setCases] = useState<any[]>(mockCases);
+  const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCases, setTotalCases] = useState(0);
+  const perPage = 9;
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
-        const data = await fetchAllCases();
-        if (data.length > 0) {
-          setCases(data);
-        }
+        const { cases: data, total } = await fetchAllCases(isPremium, { page: currentPage, perPage });
+        setCases(data);
+        setTotalCases(total);
       } catch (e) {
         console.error("Error loading cases:", e);
       } finally {
@@ -107,7 +112,9 @@ export default function CasesPage() {
       }
     }
     load();
-  }, []);
+  }, [isPremium, currentPage]);
+
+  const totalPages = Math.ceil(totalCases / perPage);
 
   const filteredCases = cases.filter(c => 
     (selectedSubject === "All Subjects" || (c.subject && c.subject.includes(selectedSubject))) &&
@@ -119,6 +126,18 @@ export default function CasesPage() {
       <section>
         <h1 className="text-4xl font-bold mb-2">Case <span className="text-gradient">Library</span></h1>
         <p className="text-muted italic">Explore thousands of structured case summaries from Nigerian and International courts.</p>
+        
+        {!isPremium && (
+          <div className="mt-4 p-4 glass rounded-2xl border-primary/20 bg-primary/5 flex items-center justify-between">
+            <p className="text-xs text-muted italic">
+              <span className="text-primary font-black uppercase mr-2">Free Plan:</span> 
+              Viewing <span className="text-foreground font-bold italic underline">Top 50 Landmark Cases</span> only. Upgrade to access 1,000+ cases.
+            </p>
+            <Link href="/subscription" className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline">
+              Unlock All Cases
+            </Link>
+          </div>
+        )}
       </section>
 
       {/* Search & Filter Bar */}
@@ -212,19 +231,47 @@ export default function CasesPage() {
         ))}
       </section>
 
-      {/* Pagination Placeholder */}
-      <section className="py-12 flex justify-center">
-         <div className="flex gap-2">
-            {[1, 2, 3, "...", 12].map((p, i) => (
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <section className="py-12 flex justify-center">
+           <div className="flex gap-2">
               <button 
-                key={i} 
-                className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ${p === 1 ? 'bg-primary text-background' : 'glass border-white/5 hover:border-white/10 text-muted'}`}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs glass border-white/5 disabled:opacity-30"
               >
-                {p}
+                &larr;
               </button>
-            ))}
-         </div>
-      </section>
+              
+              {Array.from({ length: totalPages }).map((_, i) => {
+                const p = i + 1;
+                // Simple logic: show first 3, last 1, and current +/- 1
+                if (totalPages > 8 && (p > 3 && p < totalPages && Math.abs(p - currentPage) > 1)) {
+                   if (p === 4 || p === totalPages - 1) return <span key={p} className="text-muted">...</span>;
+                   return null;
+                }
+
+                return (
+                  <button 
+                    key={p} 
+                    onClick={() => setCurrentPage(p)}
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs transition-all ${currentPage === p ? 'bg-primary text-background shadow-lg shadow-primary/20' : 'glass border-white/5 hover:border-white/10 text-muted'}`}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs glass border-white/5 disabled:opacity-30"
+              >
+                &rarr;
+              </button>
+           </div>
+        </section>
+      )}
     </div>
   );
 }

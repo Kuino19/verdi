@@ -12,11 +12,14 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useUserContext } from "@/components/app/UserContext";
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where, QueryConstraint } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { doc, updateDoc, increment as firestoreIncrement } from "firebase/firestore";
-import { addForumReply, likeForumPost, addPoints } from "@/lib/firebase/db";
-import { ArrowLeft, Heart, Send } from "lucide-react";
+import { doc, getDoc, updateDoc, increment as firestoreIncrement } from "firebase/firestore";
+import { addForumReply, likeForumPost, addPoints, incrementUsage } from "@/lib/firebase/db";
+import { logEvent, EVENTS } from "@/lib/firebase/analytics-utils";
+import { ArrowLeft, Heart, Send, Crown, GraduationCap } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ForumPost {
   id: string;
@@ -29,10 +32,11 @@ interface ForumPost {
   likes: number;
   replies: number;
   createdAt: any;
+  isPremiumAuthor?: boolean;
 }
 
 export default function CommunityPage() {
-  const { uid, userName, university } = useUserContext();
+  const { uid, userName, university, isPremium } = useUserContext();
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -49,8 +53,17 @@ export default function CommunityPage() {
   const [newReply, setNewReply] = useState("");
   const [isReplying, setIsReplying] = useState(false);
 
+  // Space Filtering
+  const [activeSpace, setActiveSpace] = useState("General Discussion");
+
   useEffect(() => {
-    const q = query(collection(db, "forums"), orderBy("createdAt", "desc"));
+    setIsLoading(true);
+    const constraints: QueryConstraint[] = [orderBy("createdAt", "desc")];
+    if (activeSpace !== "General Discussion") {
+      constraints.unshift(where("topicTag", "==", activeSpace));
+    }
+
+    const q = query(collection(db, "forums"), ...constraints);
     const unsub = onSnapshot(q, (snapshot) => {
       const fetchedPosts: ForumPost[] = [];
       snapshot.forEach(doc => {
@@ -60,7 +73,7 @@ export default function CommunityPage() {
       setIsLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [activeSpace]);
 
   useEffect(() => {
     if (!selectedPost) {
@@ -82,6 +95,31 @@ export default function CommunityPage() {
     e.preventDefault();
     if (!uid || !newTitle.trim() || !newContent.trim()) return;
 
+    // Daily Limit Check for FREE users
+    if (!isPremium) {
+      const userRef = doc(db, "users", uid);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data();
+      const today = new Date().toISOString().split("T")[0];
+      const communityUsage = userData?.communityUsage || { date: today, count: 0 };
+      
+      if (communityUsage.date !== today) {
+        communityUsage.date = today;
+        communityUsage.count = 0;
+      }
+
+      if (communityUsage.count >= 3) {
+        alert("Daily community limit reached (3 posts). Upgrade to VERDI Pro for unlimited academic discussions!");
+        setIsCreating(false);
+        return;
+      }
+
+      // Update local usage immediately for guard
+      await updateDoc(userRef, {
+        communityUsage: { date: today, count: communityUsage.count + 1 }
+      });
+    }
+
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, "forums"), {
@@ -93,11 +131,20 @@ export default function CommunityPage() {
         topicTag: newTag,
         likes: 0,
         replies: 0,
+        isPremiumAuthor: isPremium,
         createdAt: serverTimestamp()
       });
 
       // Reward points!
       await addPoints(uid, 5);
+      await incrementUsage(uid, "communityCount");
+
+      // Analytics Logging
+      logEvent("community_post_create", {
+        topic: newTag,
+        title_length: newTitle.length,
+        is_premium: isPremium
+      });
 
       // Reset
       setIsCreating(false);
@@ -118,6 +165,10 @@ export default function CommunityPage() {
     if (selectedPost && selectedPost.id === postId) {
       setSelectedPost({ ...selectedPost, likes: selectedPost.likes + 1 });
     }
+    logEvent("community_like", {
+      post_id: postId,
+      is_premium: isPremium
+    });
   };
 
   const handleReplySubmit = async (e: React.FormEvent) => {
@@ -132,6 +183,12 @@ export default function CommunityPage() {
         university: university || "Nigerian University",
         content: newReply,
       });
+      // Analytics Logging
+      logEvent("community_reply_complete", {
+        post_id: selectedPost.id,
+        is_premium: isPremium
+      });
+
       setNewReply("");
       await addPoints(uid, 2); // 2 XP per reply
     } catch (error) {
@@ -231,13 +288,17 @@ export default function CommunityPage() {
               <h4 className="flex items-center gap-2 text-[10px] font-black text-muted uppercase tracking-widest mb-6 italic">
                  <Users2 className="w-4 h-4" /> Spaces
               </h4>
-              <div className="space-y-4">
-                 {["General Discussion", "Legal Concepts", "Exam Preparation", "Career Advice"].map((s, i) => (
-                   <button key={i} className={`w-full text-left flex items-center gap-3 p-3 rounded-xl transition-all ${i === 0 ? 'bg-primary/10 text-primary font-bold' : 'text-muted hover:bg-white/5 hover:text-foreground text-sm font-medium'}`}>
-                      <Tag className="w-3.5 h-3.5" /> {s}
-                   </button>
-                 ))}
-              </div>
+               <div className="space-y-4">
+                  {["General Discussion", "Legal Concepts", "Exam Preparation", "Career Advice"].map((s, i) => (
+                    <button 
+                      key={i} 
+                      onClick={() => setActiveSpace(s)}
+                      className={`w-full text-left flex items-center gap-3 p-3 rounded-xl transition-all ${activeSpace === s ? 'bg-primary/10 text-primary font-bold border border-primary/20' : 'text-muted hover:bg-white/5 hover:text-foreground text-sm font-medium border border-transparent'}`}
+                    >
+                       <Tag className="w-3.5 h-3.5" /> {s}
+                    </button>
+                  ))}
+               </div>
            </div>
         </div>
       </div>
@@ -292,7 +353,10 @@ export default function CommunityPage() {
                                   {post.author[0]}
                               </div>
                               <div>
-                                  <h4 className="font-bold text-sm mb-0.5">{post.author}</h4>
+                                  <h4 className="font-bold text-sm mb-0.5 flex items-center gap-1">
+                                    {post.author}
+                                    {post.isPremiumAuthor && <Crown className="w-3 h-3 text-primary fill-current" />}
+                                  </h4>
                                   <p className="text-[9px] text-muted font-bold uppercase tracking-widest">{post.university}</p>
                               </div>
                             </div>
@@ -302,7 +366,11 @@ export default function CommunityPage() {
                         </div>
 
                         <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors leading-snug">{post.title}</h3>
-                        <p className="text-sm text-muted leading-relaxed mb-6 italic opacity-80 line-clamp-3">{post.content}</p>
+                        <div className="text-sm text-muted leading-relaxed mb-6 prose prose-invert line-clamp-3 prose-p:italic prose-p:opacity-80">
+                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {post.content}
+                           </ReactMarkdown>
+                        </div>
 
                         <div className="flex items-center gap-6 pt-4 border-t border-white/5">
                             <button onClick={(e) => handleLike(e, post.id)} className="flex items-center gap-2 text-xs font-bold text-muted hover:text-rose-500 transition-colors">
@@ -332,12 +400,19 @@ export default function CommunityPage() {
                       {selectedPost.author[0]}
                     </div>
                     <div>
-                        <h4 className="font-bold text-lg">{selectedPost.author}</h4>
+                        <h4 className="font-bold text-lg flex items-center gap-2">
+                           {selectedPost.author}
+                           {selectedPost.isPremiumAuthor && <Crown className="w-4 h-4 text-primary fill-current" />}
+                        </h4>
                         <p className="text-xs text-muted font-bold uppercase tracking-widest">{selectedPost.university}</p>
                     </div>
                  </div>
-                 <h2 className="text-3xl font-bold mb-6 italic">{selectedPost.title}</h2>
-                 <p className="text-base text-muted leading-relaxed italic whitespace-pre-wrap mb-10">{selectedPost.content}</p>
+                  <h2 className="text-3xl font-bold mb-6 italic">{selectedPost.title}</h2>
+                  <div className="text-base text-muted leading-relaxed prose prose-invert max-w-none mb-10 prose-p:italic prose-p:leading-relaxed">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {selectedPost.content}
+                    </ReactMarkdown>
+                  </div>
                  
                  <div className="flex items-center gap-6 py-6 border-t border-white/5">
                     <button onClick={(e) => handleLike(e, selectedPost.id)} className="flex items-center gap-2 text-sm font-bold text-muted hover:text-rose-500 transition-colors">
@@ -358,12 +433,19 @@ export default function CommunityPage() {
                          <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-black text-primary">
                             {reply.author[0]}
                          </div>
-                         <div>
-                            <p className="text-xs font-bold">{reply.author}</p>
-                            <p className="text-[8px] text-muted uppercase font-bold">{reply.university}</p>
-                         </div>
-                      </div>
-                      <p className="text-sm text-muted leading-relaxed italic opacity-90">{reply.content}</p>
+                          <div>
+                             <p className="text-xs font-bold">{reply.author}</p>
+                             <div className="flex items-center gap-1 mt-0.5">
+                                <GraduationCap className="w-2.5 h-2.5 text-emerald-500" />
+                                <p className="text-[8px] text-muted uppercase font-bold">{reply.university}</p>
+                             </div>
+                          </div>
+                       </div>
+                       <div className="text-sm text-muted leading-relaxed prose prose-invert prose-p:italic prose-p:opacity-90">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {reply.content}
+                          </ReactMarkdown>
+                       </div>
                    </motion.div>
                  ))}
 

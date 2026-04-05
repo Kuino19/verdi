@@ -16,10 +16,14 @@ import {
 import { useState, useEffect } from "react";
 import { useUserContext } from "@/components/app/UserContext";
 import { db } from "@/lib/firebase/client";
+import { incrementUsage } from "@/lib/firebase/db";
+import PremiumGuard from "@/components/shared/PremiumGuard";
+import { useRouter } from "next/navigation";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 
 export default function FlashcardsPage() {
-  const { uid } = useUserContext();
+  const { uid, isPremium, flashcardCount } = useUserContext();
+  const router = useRouter();
   const [flashcards, setFlashcards] = useState<any[]>([]);
   const [decks, setDecks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +91,17 @@ export default function FlashcardsPage() {
           <h1 className="text-4xl font-bold mb-2">Legal <span className="text-gradient">Flashcards</span></h1>
           <p className="text-muted italic">Master legal definitions and case ratios using spaced repetition.</p>
         </div>
-        <button className="flex items-center gap-2 px-6 py-3 bg-white/5 glass rounded-xl text-xs font-black uppercase tracking-widest border border-white/5 hover:border-primary/20 transition-all">
+        <button 
+          onClick={() => {
+             if (!isPremium && flashcardCount >= 1) {
+                alert("Free plan limit reached (1 Deck). Upgrade to Pro for unlimited decks!");
+                router.push("/subscription");
+                return;
+             }
+             alert("Manual creation tool coming in Phase 2!");
+          }}
+          className="flex items-center gap-2 px-6 py-3 bg-white/5 glass rounded-xl text-xs font-black uppercase tracking-widest border border-white/5 hover:border-primary/20 transition-all"
+        >
           <Plus className="w-4 h-4" /> Create Deck
         </button>
       </header>
@@ -129,10 +143,12 @@ export default function FlashcardsPage() {
              </div>
            )}
            
-           <div className="p-8 glass rounded-[32px] border-dashed border-2 border-white/10 flex flex-col items-center justify-center text-center opacity-50 transition-all cursor-not-allowed">
-              <Zap className="w-8 h-8 text-primary mb-4" />
-              <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">Auto-Generate Decks<br/><span className="text-[10px] text-primary hidden">Pro Feature</span></p>
-           </div>
+           <PremiumGuard>
+            <div className="p-8 glass rounded-[32px] border-dashed border-2 border-white/10 flex flex-col items-center justify-center text-center group cursor-pointer hover:border-primary/40 transition-all">
+               <Zap className="w-8 h-8 text-primary mb-4" />
+               <p className="text-xs font-bold uppercase tracking-widest leading-relaxed">Auto-Generate Decks<br/><span className="text-[10px] text-primary">Pro Feature</span></p>
+            </div>
+         </PremiumGuard>
         </section>
       ) : currentCard ? (
         <motion.div 

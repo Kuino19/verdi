@@ -25,22 +25,39 @@ import {
   Gift
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useFeatureFlags } from "@/components/app/FeatureContext";
+import { useUserContext } from "@/components/app/UserContext";
+import { ChevronDown, ChevronRight, Lock } from "lucide-react";
 
 const menuItems = [
-  { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-  { name: "Cases", icon: BookOpen, href: "/cases" },
-  { name: "AI Assistant", icon: BrainCircuit, href: "/assistant" },
-  { name: "Exam Generator", icon: FileQuestion, href: "/exam-generator" },
-  { name: "CaseFlow", icon: Network, href: "/caseflow" },
-  { name: "Flashcards", icon: Layers, href: "/flashcards" },
-  { name: "Study Planner", icon: Calendar, href: "/study-planner" },
-  { name: "Past Papers", icon: Library, href: "/past-papers" },
-  { name: "Dictionary", icon: BookMarkedIcon, href: "/dictionary" },
-  { name: "Community", icon: Users2, href: "/community" },
-  { name: "Leaderboard", icon: Trophy, href: "/leaderboard" },
-  { name: "Rewards", icon: Gift, href: "/rewards" },
-  { name: "Mock Trial", icon: Gavel, href: "/moot-court" },
-  { name: "Subscription", icon: Crown, href: "/subscription" },
+  { name: "Dashboard",   icon: LayoutDashboard,  href: "/dashboard", featureId: "dashboard" },
+  { 
+    name: "Cases",       
+    icon: BookOpen,         
+    href: "/cases",
+    featureId: "cases",
+    subItems: [
+      { name: "CaseFlow", icon: Network, href: "/caseflow", featureId: "caseflow", isPremium: true },
+    ]
+  },
+  { name: "AI Assistant", icon: BrainCircuit,   href: "/assistant", featureId: "assistant" },
+  { name: "Exam Generator", icon: FileQuestion, href: "/exam-generator", featureId: "exam-generator", isPremium: true },
+  { 
+    name: "Study Planner", 
+    icon: Calendar,      
+    href: "/study-planner",
+    featureId: "study-planner",
+    subItems: [
+      { name: "Flashcards", icon: Layers, href: "/flashcards", featureId: "flashcards", isPremium: true },
+    ]
+  },
+  { name: "Past Papers", icon: Library,       href: "/past-papers", featureId: "past-papers", isPremium: true },
+  { name: "Dictionary",  icon: BookMarkedIcon, href: "/dictionary", featureId: "dictionary" },
+  { name: "Community",   icon: Users2,         href: "/community", featureId: "community" },
+  { name: "Leaderboard", icon: Trophy,         href: "/leaderboard", featureId: "leaderboard", isPremium: true },
+  { name: "Rewards",     icon: Gift,           href: "/rewards", featureId: "rewards", isPremium: true },
+  { name: "Mock Trial",  icon: Gavel,          href: "/moot-court", featureId: "moot-court", isPremium: true },
+  { name: "Subscription",icon: Crown,          href: "/subscription", featureId: "subscription" },
 ];
 
 interface SidebarProps {
@@ -51,6 +68,8 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { flags } = useFeatureFlags() || { flags: {} };
+  const { isPremium } = useUserContext();
 
   const handleSignOut = async () => {
     try {
@@ -80,28 +99,68 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-grow px-3 overflow-y-auto no-scrollbar">
-        <div className="space-y-0.5">
+        <div className="space-y-1">
           {menuItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isEnabled = flags[item.featureId as string] !== false;
+            if (!isEnabled) return null;
+
+            const isActive = pathname === item.href || (item.subItems?.some(sub => pathname === sub.href));
+            const hasSubItems = item.subItems && item.subItems.length > 0;
+
             return (
-              <Link key={item.name} href={item.href} onClick={onClose}>
-                <div className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all relative
-                  ${isActive
-                    ? "bg-white/8 text-foreground"
-                    : "text-muted hover:bg-white/5 hover:text-foreground"
-                  }
-                `}>
-                  <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-primary" : ""}`} />
-                  <span className="text-sm">{item.name}</span>
-                  {isActive && (
-                    <motion.div
-                      layoutId="sidebar-active"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-primary rounded-r-full"
-                    />
-                  )}
-                </div>
-              </Link>
+              <div key={item.name} className="space-y-1">
+                <Link href={item.href} onClick={onClose}>
+                  <div className={`
+                    flex items-center justify-between px-3 py-2.5 rounded-lg transition-all relative group
+                    ${isActive
+                      ? "bg-white/8 text-foreground"
+                      : "text-muted hover:bg-white/5 hover:text-foreground"
+                    }
+                  `}>
+                    <div className="flex items-center gap-3">
+                      <item.icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-primary" : ""}`} />
+                      <span className="text-sm font-medium">{item.name}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                       {item.isPremium && !isPremium && <Lock className="w-3 h-3 text-primary/50" />}
+                       {hasSubItems && (
+                          isActive ? <ChevronDown className="w-3.5 h-3.5 text-muted/50" /> : <ChevronRight className="w-3.5 h-3.5 text-muted/20 group-hover:text-muted/50 transition-all" />
+                       )}
+                    </div>
+
+                    {isActive && (
+                      <motion.div
+                        layoutId="sidebar-active"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-primary rounded-r-full"
+                      />
+                    )}
+                  </div>
+                </Link>
+
+                {/* Sub-items rendering */}
+                {hasSubItems && isActive && (
+                  <div className="ml-9 space-y-1 py-1 border-l border-white/5">
+                    {item.subItems?.map((sub) => {
+                      const isSubEnabled = flags[sub.featureId as string] !== false;
+                      if (!isSubEnabled) return null;
+                      
+                      const isSubActive = pathname === sub.href;
+                      return (
+                        <Link key={sub.name} href={sub.href} onClick={onClose}>
+                          <div className={`
+                            flex items-center justify-between px-3 py-1.5 rounded-md transition-all
+                            ${isSubActive ? "text-primary font-bold" : "text-muted/60 hover:text-foreground"}
+                          `}>
+                            <span className="text-xs">{sub.name}</span>
+                            {sub.isPremium && !isPremium && <Lock className="w-2.5 h-2.5" />}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

@@ -154,7 +154,7 @@ export default function MootCourtPage() {
         <div className="flex-1 min-h-0 flex flex-col glass rounded-[32px] md:rounded-[48px] border-white/5 overflow-hidden relative">
            
            {!scenarioName ? (
-             <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-10">
+             <div className="flex-1 overflow-y-auto custom-scroll flex flex-col items-center justify-start p-10 md:p-12 text-center space-y-10">
                 <motion.div 
                   initial={{ scale: 0.8, opacity: 0 }} 
                   animate={{ scale: 1, opacity: 1 }}

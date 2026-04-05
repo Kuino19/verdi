@@ -13,11 +13,15 @@ import {
   Crown
 } from "lucide-react";
 import { useState } from "react";
+import { logEvent, EVENTS } from "@/lib/firebase/analytics-utils";
+import { useUserContext } from "@/components/app/UserContext";
 
 const plans = [
   {
+    id: "free",
     name: "Free",
     price: "₦0",
+    value: 0,
     period: "forever",
     desc: "For the occasional student",
     features: ["5 Case Summaries / Day", "Basic AI Assistant", "Public Community", "Standard Leaderboard"],
@@ -26,8 +30,10 @@ const plans = [
     color: "bg-white/5"
   },
   {
+    id: "pro_weekly",
     name: "Weekly Pro",
     price: "₦1,000",
+    value: 1000,
     period: "per week",
     desc: "Perfect for exam week",
     features: ["Unlimited Cases", "Advanced AI Legal Tutor", "Exam Generator (5/day)", "CaseFlow Explorer", "Dark/Light Theme"],
@@ -36,8 +42,10 @@ const plans = [
     color: "bg-white/5"
   },
   {
+    id: "pro_monthly",
     name: "Monthly Pro",
     price: "₦3,500",
+    value: 3500,
     period: "per month",
     desc: "The full scholar experience",
     features: ["Everything in Weekly", "Unlimited Exam Prep", "Early Access to Features", "Verified Badge", "Priority Support"],
@@ -48,6 +56,22 @@ const plans = [
 ];
 
 export default function UpgradePage() {
+  const { uid, userEmail, isPremium } = useUserContext();
+
+  const handleUpgrade = (plan: any) => {
+    if (plan.id === "free") return;
+
+    logEvent(EVENTS.PREMIUM_UPGRADE_CLICK, {
+      plan_id: plan.id,
+      plan_name: plan.name,
+      price: plan.value,
+      email: userEmail
+    });
+
+    // Mock prompt for now (Actual Paystack logic can go here)
+    alert(`Starting ${plan.name} Checkout...\nThis would normally redirect to Paystack.`);
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-16">
       <header className="text-center space-y-4">
@@ -60,47 +84,56 @@ export default function UpgradePage() {
       </header>
 
       <div className="grid lg:grid-cols-3 gap-8">
-         {plans.map((plan, i) => (
-           <motion.div
-             key={i}
-             initial={{ opacity: 0, y: 30 }}
-             animate={{ opacity: 1, y: 0 }}
-             transition={{ delay: i * 0.1 }}
-             className={`p-10 glass rounded-[48px] border-white/5 flex flex-col relative overflow-hidden group ${plan.color}`}
-           >
-              {plan.active && (
-                <div className="absolute top-8 right-8">
-                   <Crown className="w-8 h-8 text-primary animate-bounce shadow-2xl" />
-                </div>
-              )}
+         {plans.map((plan, i) => {
+           const isCurrent = (plan.id === "free" && !isPremium) || (plan.id === "pro_monthly" && isPremium); 
+           // Simple logic for "current plan" if they are pro
+           
+           return (
+             <motion.div
+               key={i}
+               initial={{ opacity: 0, y: 30 }}
+               animate={{ opacity: 1, y: 0 }}
+               transition={{ delay: i * 0.1 }}
+               className={`p-10 glass rounded-[48px] border-white/5 flex flex-col relative overflow-hidden group ${plan.color}`}
+             >
+                {plan.active && (
+                  <div className="absolute top-8 right-8">
+                     <Crown className="w-8 h-8 text-primary animate-bounce shadow-2xl" />
+                  </div>
+                )}
 
-              <div className="mb-10">
-                 <h3 className="text-sm font-black text-muted uppercase tracking-[0.2em] mb-2">{plan.name}</h3>
-                 <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black italic">{plan.price}</span>
-                    <span className="text-xs text-muted font-bold uppercase">{plan.period}</span>
-                 </div>
-                 <p className="mt-4 text-xs text-muted italic opacity-60 leading-relaxed">{plan.desc}</p>
-              </div>
-
-              <div className="space-y-4 mb-12 flex-grow">
-                 {plan.features.map((f, j) => (
-                   <div key={j} className="flex items-center gap-3">
-                      <CheckCircle2 className={`w-4 h-4 ${plan.active ? 'text-primary' : 'text-emerald-500'}`} />
-                      <span className="text-xs font-bold text-muted group-hover:text-foreground transition-colors">{f}</span>
+                <div className="mb-10">
+                   <h3 className="text-sm font-black text-muted uppercase tracking-[0.2em] mb-2">{plan.name}</h3>
+                   <div className="flex items-baseline gap-2">
+                      <span className="text-4xl font-black italic">{plan.price}</span>
+                      <span className="text-xs text-muted font-bold uppercase">{plan.period}</span>
                    </div>
-                 ))}
-              </div>
+                   <p className="mt-4 text-xs text-muted italic opacity-60 leading-relaxed">{plan.desc}</p>
+                </div>
 
-              <button className={`w-full py-5 rounded-[24px] font-black text-[12px] uppercase tracking-widest transition-all ${
-                plan.active 
-                  ? 'bg-primary text-background shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95' 
-                  : 'glass border-white/10 hover:bg-white/10'
-              }`}>
-                 {plan.button}
-              </button>
-           </motion.div>
-         ))}
+                <div className="space-y-4 mb-12 flex-grow">
+                   {plan.features.map((f, j) => (
+                     <div key={j} className="flex items-center gap-3">
+                        <CheckCircle2 className={`w-4 h-4 ${plan.active ? 'text-primary' : 'text-emerald-500'}`} />
+                        <span className="text-xs font-bold text-muted group-hover:text-foreground transition-colors">{f}</span>
+                     </div>
+                   ))}
+                </div>
+
+                <button 
+                  onClick={() => handleUpgrade(plan)}
+                  className={`w-full py-5 rounded-[24px] font-black text-[12px] uppercase tracking-widest transition-all ${
+                  isCurrent 
+                    ? 'bg-emerald-500/10 text-emerald-500 cursor-default' 
+                    : plan.active 
+                      ? 'bg-primary text-background shadow-2xl shadow-primary/30 hover:scale-105 active:scale-95' 
+                      : 'glass border-white/10 hover:bg-white/10'
+                }`}>
+                   {isCurrent ? "Current Plan" : plan.button}
+                </button>
+             </motion.div>
+           );
+         })}
       </div>
 
       {/* Trust Badges */}

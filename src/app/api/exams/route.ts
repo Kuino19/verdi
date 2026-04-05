@@ -1,102 +1,100 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { adminAuth, adminDb } from "@/lib/firebase/admin";
-
+export const dynamic = "force-dynamic";
+import { AiVault } from "@/lib/ai/vault";
+import { ExamGenerateSchema } from "@/lib/validators/schemas";
+import { validateSessionCookie } from "@/lib/api/auth-middleware";
+import { handleError, createSuccessResponse } from "@/lib/errors/handler";
+import { AppError } from "@/lib/errors/AppError";
+import { adminDb } from "@/lib/firebase/admin";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: Request) {
+  const requestId = crypto.randomUUID();
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("session")?.value;
-
-    if (!sessionCookie) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Validate session
+    const authData = await validateSessionCookie(req as any);
+    if (!authData) {
+      throw AppError.unauthorized("Session expired or invalid");
     }
 
-    let decodedClaims;
-    try {
-      decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
-    } catch (error) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const uid = authData.uid;
+    const body = await req.json();
 
-    const { topic = "General Nigerian Law", numQuestions = 5 } = await req.json();
-    const uid = decodedClaims.uid;
+    // Validate request payload with defaults
+    const validatedData = ExamGenerateSchema.parse(body);
+    const { text, questionCount = 5, difficulty = "medium", questionType = "mcq" } = validatedData;
     
     // Check Premium status / Rate limit
     const userRef = adminDb.collection("users").doc(uid);
     const userDoc = await userRef.get();
-    let isPremium = false;
+    
+    if (!userDoc.exists) {
+      throw AppError.notFound("User profile not found");
+    }
 
-    if (userDoc.exists) {
-      const data = userDoc.data();
-      isPremium = !!data?.isPremium;
+    const data = userDoc.data();
+    const isPremium = !!data?.isPremium;
+    
+    if (!isPremium) {
+      const today = new Date().toISOString().split("T")[0];
+      const examUsage = data?.examUsage || { date: today, count: 0 };
       
-      if (!isPremium) {
-        const today = new Date().toISOString().split("T")[0];
-        const examUsage = data?.examUsage || { date: today, count: 0 };
-        
-        if (examUsage.date !== today) {
-          examUsage.date = today;
-          examUsage.count = 1;
-          await userRef.update({ examUsage });
-        } else {
-          if (examUsage.count >= 2) { // 2 free exams per day
-            return NextResponse.json({ 
-              error: "Rate limit exceeded", 
-              details: "You have reached your limit of 2 free exams per day. Upgrade to Premium for unlimited access." 
-            }, { status: 429 });
-          } else {
-            examUsage.count += 1;
-            await userRef.update({ examUsage });
-          }
-        }
+      if (examUsage.date !== today) {
+        examUsage.date = today;
+        examUsage.count = 1;
+        await userRef.update({ examUsage });
+      } else if (examUsage.count >= 2) {
+        throw AppError.tooManyRequests(
+          "Rate limit exceeded",
+          "You have reached your limit of 2 free exams per day. Upgrade to Premium for unlimited access."
+        );
+      } else {
+        examUsage.count += 1;
+        await userRef.update({ examUsage });
       }
     }
 
-    const systemInstruction = `You are a strict Nigerian University Law Professor (LL.B. level) generating a multiple-choice mock exam on the topic: ${topic}.
-Generate exactly ${numQuestions} highly challenging questions. 
+    const systemInstruction = `You are a strict Nigerian University Law Professor (LL.B. level) generating a ${questionType} mock exam.
+Difficulty: ${difficulty}.
+Generate exactly ${questionCount} highly challenging questions. 
 Emulate rigorous exams from UNILAG, UI, OAU, UNN. 
 Return ONLY a valid JSON array of objects.
 Keys: "question", "options" (4 strings), "answer" (0-3), "explanation" (citing Nigerian statutes/cases).`;
 
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: systemInstruction },
-          { role: "user", content: `Generate ${numQuestions} questions on ${topic}.` }
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.6
-      })
+    const messages = [
+      { role: "system", content: systemInstruction },
+      { role: "user", content: `Generate ${questionCount} questions based on this text:\n\n${text}` }
+    ];
+
+    const rawContent = await AiVault.execute(messages, {
+      type: "exam",
+      temperature: 0.6,
     });
 
-    const groqData = await groqRes.json();
-    let rawContent = groqData.choices[0]?.message?.content || "{}";
-    
     let quizData;
     try {
-       const parsed = JSON.parse(rawContent);
-       quizData = Array.isArray(parsed) ? parsed : (parsed.quiz || parsed.questions || parsed.exams || Object.values(parsed).find(Array.isArray) || []);
+      const parsed = JSON.parse(rawContent);
+      quizData = Array.isArray(parsed) ? parsed : (parsed.quiz || parsed.questions || parsed.exams || Object.values(parsed).find(Array.isArray) || []);
+      
+      if (!Array.isArray(quizData) || quizData.length === 0) {
+        throw new Error("No questions generated");
+      }
     } catch (e) {
-       console.error("Groq Exam parsing error", rawContent);
-       return NextResponse.json({ error: "Invalid JSON from AI" }, { status: 500 });
+      throw AppError.badRequest(
+        "Failed to parse exam data",
+        e instanceof Error ? e.message : "Invalid JSON from AI"
+      );
     }
 
-    return NextResponse.json({
-      quiz: quizData.slice(0, numQuestions),
-    });
+    logger.info("Exam generated successfully", { uid, count: quizData.length, difficulty, requestId });
+    return createSuccessResponse({
+      quiz: quizData.slice(0, questionCount),
+    }, 200);
 
-  } catch (error: any) {
-    console.error("Exam API Error Details:", error);
-    return NextResponse.json({ 
-      error: "Failed to generate exam",
-      details: error.message 
-    }, { status: 500 });
+  } catch (error) {
+    logger.error("Exam API Error", { 
+      error: error instanceof Error ? error.message : String(error), 
+      requestId 
+    });
+    return handleError(error, requestId);
   }
 }

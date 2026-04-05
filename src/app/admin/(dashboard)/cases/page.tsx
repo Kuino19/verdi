@@ -12,12 +12,19 @@ import {
   Star,
   Zap,
   Clock,
-  Loader2
+  Loader2,
+  CheckCircle2
 } from "lucide-react";
 import Link from "next/link";
 import { fetchAllCases } from "@/lib/firebase/db";
 
 export default function AdminCasesPage() {
+  // - [x] **Admin Case Vetting & Editing**
+  // - [x] Create `admin/(dashboard)/cases/[id]/page.tsx` (Case Editor).
+  // - [x] Implement Vetting Status toggle in the Case Editor.
+  // - [x] Create `admin/vetting/page.tsx` TO-DO list.
+  // - [x] Link Edit button in the admin cases table.
+
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,8 +33,8 @@ export default function AdminCasesPage() {
   useEffect(() => {
     async function loadCases() {
       try {
-        const data = await fetchAllCases();
-        setCases(data);
+        const { cases } = await fetchAllCases(true);
+        setCases(cases);
       } catch (e) {
         console.error(e);
       } finally {
@@ -53,7 +60,7 @@ export default function AdminCasesPage() {
       }
       
       // Refresh library
-      const updatedCases = await fetchAllCases();
+      const { cases: updatedCases } = await fetchAllCases(true);
       setCases(updatedCases);
     } catch (err: any) {
       alert(err.message);
@@ -161,10 +168,15 @@ export default function AdminCasesPage() {
                        </td>
                        <td className="px-8 py-6">
                           <div className="flex items-center gap-2">
-                             {c.processed ? (
+                             {c.vetted ? (
                                <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                                   <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest italic">Processed</span>
+                                   <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                   <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest italic">Vetted</span>
+                               </div>
+                             ) : c.processed ? (
+                               <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                   <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                   <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest italic">AI Summary</span>
                                </div>
                              ) : (
                                <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 rounded-lg border border-amber-500/20">
@@ -179,9 +191,9 @@ export default function AdminCasesPage() {
                        </td>
                        <td className="px-8 py-6">
                           <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                             <button title="Edit Case" className="p-3 glass rounded-xl text-muted hover:text-foreground transition-all">
+                             <Link href={`/admin/cases/${c.id}`} title="Edit Case" className="p-3 glass rounded-xl text-muted hover:text-foreground transition-all">
                                 <Edit3 className="w-4 h-4" />
-                             </button>
+                             </Link>
                              {!c.processed && (
                                <button 
                                  onClick={() => handleSummarize(c.id)}

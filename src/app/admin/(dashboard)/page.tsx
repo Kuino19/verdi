@@ -15,6 +15,8 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { collection, getCountFromServer, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { FeatureProvider } from "@/components/app/FeatureContext";
+import FeatureManager from "@/components/admin/FeatureManager";
 
 export default function AdminDashboard() {
   const [userCount, setUserCount] = useState<string>("...");
@@ -51,7 +53,8 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="space-y-12">
+    <FeatureProvider>
+      <div className="space-y-12">
       <header className="flex items-center justify-between">
         <div>
            <h1 className="text-4xl font-bold mb-2 italic">Admin <span className="text-primary italic">Command Center</span></h1>
@@ -119,27 +122,33 @@ export default function AdminDashboard() {
             </div>
          </section>
 
-         {/* Quick Actions */}
-         <section className="space-y-6">
-            <div className="p-10 glass rounded-[56px] border-primary/20 bg-gradient-to-br from-primary/10 to-transparent">
-               <ShieldCheck className="w-10 h-10 text-primary mb-6" />
-               <h3 className="text-xl font-bold mb-2 italic">Quick Actions</h3>
-               <p className="text-xs text-muted mb-8 italic">Common administrative tasks for managing Verdi.</p>
-               
-               <div className="space-y-3">
-                  <Link href="/admin/cases/new" className="w-full py-4 bg-primary text-background font-black rounded-2xl flex items-center justify-center gap-3 hover:scale-105 transition-all text-xs uppercase tracking-widest">
-                     <FileText className="w-4 h-4" /> Upload New Case
-                  </Link>
-                  <button className="w-full py-4 glass border-white/5 text-muted font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-white/10 transition-all text-xs uppercase tracking-widest">
-                     Manage Users <ChevronRight className="w-4 h-4" />
-                  </button>
-                  <button className="w-full py-4 glass border-white/5 text-muted font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-white/10 transition-all text-xs uppercase tracking-widest">
-                     System Logs <ChevronRight className="w-4 h-4" />
-                  </button>
-               </div>
-            </div>
-         </section>
-      </div>
+          {/* Feature Management */}
+          <section className="space-y-6">
+             <FeatureManager />
+          </section>
+
+          {/* Quick Actions */}
+          <section className="space-y-6">
+             <div className="p-10 glass rounded-[56px] border-primary/20 bg-gradient-to-br from-primary/10 to-transparent">
+                <ShieldCheck className="w-10 h-10 text-primary mb-6" />
+                <h3 className="text-xl font-bold mb-2 italic">Quick Actions</h3>
+                <p className="text-xs text-muted mb-8 italic">Common administrative tasks for managing Verdi.</p>
+                
+                <div className="space-y-3">
+                   <Link href="/admin/cases/new" className="w-full py-4 bg-primary text-background font-black rounded-2xl flex items-center justify-center gap-3 hover:scale-105 transition-all text-xs uppercase tracking-widest">
+                      <FileText className="w-4 h-4" /> Upload New Case
+                   </Link>
+                   <button className="w-full py-4 glass border-white/5 text-muted font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-white/10 transition-all text-xs uppercase tracking-widest">
+                      Manage Users <ChevronRight className="w-4 h-4" />
+                   </button>
+                   <button className="w-full py-4 glass border-white/5 text-muted font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-white/10 transition-all text-xs uppercase tracking-widest">
+                      System Logs <ChevronRight className="w-4 h-4" />
+                   </button>
+                </div>
+             </div>
+          </section>
+       </div>
     </div>
+    </FeatureProvider>
   );
 }
